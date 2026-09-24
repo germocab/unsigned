@@ -32,7 +32,7 @@ body{
 }
 .bubble:hover,.bubble:focus-visible{transform:scale(1.08);z-index:5;outline:2px solid #fff}
 .bubble.mine{z-index:2;box-shadow:0 0 0 3px rgba(255,255,255,.95),0 0 44px 6px var(--c)}
-.bubble svg{flex:none;overflow:visible}
+.bubble .num{flex:none;font-weight:700;letter-spacing:.02em;opacity:.8}
 .bubble span{overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--lines);overflow-wrap:anywhere}
 @keyframes drift{from{translate:0 0}to{translate:var(--dx) var(--dy)}}
 .bubble.fresh{animation:drift var(--d) ease-in-out infinite alternate,pop .8s cubic-bezier(.2,1.4,.4,1)}
@@ -96,6 +96,9 @@ textarea{
 .when{color:var(--dim);font-size:13px}
 .readTop{display:flex;align-items:center;gap:12px;margin-bottom:10px}
 .readTop p{margin:0}
+.bigNum{font-size:24px;font-weight:700;color:var(--ink)}
+#mineDlg .bigNum{text-align:center;margin:0 0 10px}
+.nextnum{margin:0 0 12px!important;color:var(--b1)!important;font-weight:600}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 4px}
 .stat{border:1px solid var(--line);border-radius:14px;padding:12px 8px;text-align:center}
 .stat b{display:block;font-size:22px;font-weight:600;color:var(--ink)}
@@ -132,7 +135,7 @@ textarea{
 <body>
 <header>
   <div>
-    <h1>Unsigned<small>v1.2</small></h1>
+    <h1>Unsigned<small>v1.3</small></h1>
     <p>Anonymous thoughts, floating together. Nothing here has a name on it.</p>
   </div>
   <div class="actions">
@@ -149,12 +152,13 @@ textarea{
 <dialog id="writeDlg">
   <div id="stepWrite">
     <h2>Write your bubble</h2>
-    <div class="warn"><b>You only get one bubble per device.</b> Once you publish it, it can't be edited or deleted, and you can't write another. Think wisely about what you want to say, or you'll lose your chance.</div>
+    <div class="warn"><b>You only have one chance.</b> Once you publish, your message can't be edited or deleted, and you can't write another. Think wisely about what you want to say, or you'll lose it.</div>
+    <p class="nextnum" id="nextNum" hidden></p>
     <p>Say anything you like. It's anonymous. Don't include names, phone numbers, emails, usernames or links.</p>
-    <textarea id="text" maxlength="500" placeholder="What's on your mind?"></textarea>
+    <textarea id="text" maxlength="1000" placeholder="What's on your mind?"></textarea>
     <div class="err" id="err" role="alert"></div>
     <div class="row">
-      <span class="count" id="count">0 / 500</span>
+      <span class="count" id="count">0 / 1000</span>
       <div class="btns">
         <button id="cancel" type="button">Cancel</button>
         <button id="review" class="go" type="button">Continue</button>
@@ -162,8 +166,9 @@ textarea{
     </div>
   </div>
   <div id="stepConfirm" hidden>
-    <h2>Publish this as your only bubble?</h2>
-    <p>This is your one chance on this device. After you publish, you can't change it or take it back.</p>
+    <h2>Publish this as your one chance?</h2>
+    <p class="nextnum" id="nextNum2" hidden></p>
+    <p>After you publish, you can't change it or take it back.</p>
     <p class="preview" id="preview"></p>
     <div class="err" id="err2" role="alert"></div>
     <div class="btns" style="justify-content:flex-end">
@@ -176,19 +181,20 @@ textarea{
 <dialog id="mineDlg">
   <h2 id="mineTitle"></h2>
   <div class="hero" id="mineHero"></div>
+  <p class="bigNum" id="mineNum"></p>
   <p class="center" id="mineText"></p>
   <p class="preview" id="minePreview"></p>
   <div class="close-row"><div class="btns"><button id="closeMine" class="go" type="button">Close</button></div></div>
 </dialog>
 
 <dialog id="readDlg">
-  <div class="readTop"><span id="readIcon"></span><p class="when" id="when"></p></div>
+  <div class="readTop"><b class="bigNum" id="readNum"></b><p class="when" id="when"></p></div>
   <p id="reader"></p>
   <div class="btns"><button id="closeRead" type="button">Close</button></div>
 </dialog>
 
 <dialog id="infoDlg">
-  <h2>Information <span style="font-weight:400;font-size:13px;color:var(--dim)">version 1.2</span></h2>
+  <h2>Information <span style="font-weight:400;font-size:13px;color:var(--dim)">version 1.3</span></h2>
 
   <h3>What is this project?</h3>
   <p>Unsigned is a social experiment: a shared universe of anonymous bubbles. Anyone with the link can write a short message and publish it. Everyone sees the same bubbles, and nobody knows who wrote which one.</p>
@@ -198,9 +204,9 @@ textarea{
 
   <h3>How it works</h3>
   <ul>
-    <li>Each device can publish one bubble, so choose your words wisely.</li>
-    <li>When you publish, you earn a colorful character that lives inside your bubble. Every bubble has its own character, and no two are alike.</li>
-    <li>Only you can tell which one is yours: your bubble gets a white ring on your device, and you can see your character anytime with the "My character" button.</li>
+    <li>You have one chance to publish, so choose your words wisely. Messages can be up to 1000 characters.</li>
+    <li>Every bubble shows its number, in the order it was published. When you publish, you earn a colorful character as a reward.</li>
+    <li>Only you can tell which bubble is yours: it gets a white ring on your device, and you can see your character anytime with the "My character" button.</li>
     <li>The limit is per browser. There are no accounts, so it can't be enforced perfectly. Clearing your browser data or using another device would allow another post, so please keep it fair.</li>
   </ul>
 
@@ -247,7 +253,7 @@ const seen = new Set();
 let mine = null;
 try{ mine = JSON.parse(localStorage.getItem(STORE_KEY)); }catch(e){}
 function saveMine(row){
-  mine = {id:row.id, body:row.body, created_at:row.created_at};
+  mine = {id:row.id, num:row.num, body:row.body, created_at:row.created_at};
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(mine)); }catch(e){}
   refreshButtons();
 }
@@ -331,10 +337,10 @@ function addBubble(row,fresh){
   $("empty").style.display="none";
   const h = hash(row.id);
   const small = innerWidth < 640;
-  const size = Math.round(Math.min(220, 112 + Math.sqrt(row.body.length)*9) * (small ? .85 : 1));
-  const icon = Math.round(size*.3);
+  const size = Math.round(Math.min(230, 112 + Math.sqrt(row.body.length)*9) * (small ? .85 : 1));
   const fs = size>150 ? 14 : 12.5;
-  const lines = Math.max(1, Math.floor((size*.78 - icon) / (fs*1.3)));
+  const numH = Math.round(fs*1.6);
+  const lines = Math.max(1, Math.floor((size*.78 - numH) / (fs*1.3)));
   const b = document.createElement("button");
   b.className = "bubble" + (fresh?" fresh":"") + (mine && mine.id===row.id ? " mine" : "");
   b.type = "button";
@@ -347,7 +353,13 @@ function addBubble(row,fresh){
   b.style.setProperty("--dy",((rnd(h,5)-.5)*(small?30:50)).toFixed(0)+"px");
   b.style.setProperty("--lines",lines);
   b.style.fontSize = fs+"px";
-  b.innerHTML = critter(row.id, icon); // built only from fixed shapes and colors
+  if(row.num!=null){
+    const n = document.createElement("div");
+    n.className = "num";
+    n.style.fontSize = Math.round(fs*(size>150?1.5:1.35))+"px";
+    n.textContent = "#"+row.num;
+    b.appendChild(n);
+  }
   const s = document.createElement("span");
   s.textContent = row.body; // textContent: never render user text as HTML
   b.appendChild(s);
@@ -357,7 +369,7 @@ function addBubble(row,fresh){
 }
 
 function openRead(row){
-  $("readIcon").innerHTML = critter(row.id, 56);
+  $("readNum").textContent = row.num!=null ? "Bubble #"+row.num : "Bubble";
   $("reader").textContent = row.body;
   $("when").textContent = new Date(row.created_at).toLocaleString();
   $("readDlg").showModal();
@@ -403,9 +415,10 @@ function showMine(isNew){
   $("mineHero").className = "hero" + (isNew ? " new" : "");
   $("mineHero").innerHTML = critter(mine.id, 150);
   $("mineText").textContent = isNew
-    ? "It now lives inside your bubble for everyone to see. Only you know it's yours, and it stays with you on this device."
+    ? "It's yours to keep on this device. Nobody else can tell which bubble is yours."
     : "You've used your one bubble on this device. Look for the white ring around it in the universe.";
   $("minePreview").textContent = mine.body;
+  $("mineNum").textContent = mine.num!=null ? "Bubble #"+mine.num : "";
   $("mineDlg").showModal();
 }
 $("openMine").onclick = ()=>showMine(false);
@@ -416,14 +429,24 @@ function showStep(step){
   $("stepWrite").hidden = step!=="write";
   $("stepConfirm").hidden = step!=="confirm";
 }
+async function showNext(){
+  ["nextNum","nextNum2"].forEach(i=>$(i).hidden=true);
+  try{
+    const {data,error} = await sb.from("bubbles").select("num").order("num",{ascending:false}).limit(1);
+    if(error) return;
+    const n = ((data[0] && data[0].num) || 0) + 1;
+    ["nextNum","nextNum2"].forEach(i=>{ $(i).textContent = "You're writing bubble #"+n; $(i).hidden=false; });
+  }catch(e){}
+}
 $("openWrite").onclick = ()=>{
   if(mine){ showMine(false); return; }
+  showNext();
   $("err").textContent = ""; $("err2").textContent = "";
   showStep("write");
   $("writeDlg").showModal(); ta.focus();
 };
 $("cancel").onclick = ()=>$("writeDlg").close();
-ta.oninput = ()=>{ $("count").textContent = ta.value.length+" / 500"; $("err").textContent=""; };
+ta.oninput = ()=>{ $("count").textContent = ta.value.length+" / 1000"; $("err").textContent=""; };
 
 $("review").onclick = ()=>{
   const text = ta.value.trim();
@@ -453,7 +476,7 @@ $("publish").onclick = async ()=>{
   }
   saveMine(data);
   addBubble(data,true);
-  ta.value=""; $("count").textContent="0 / 500";
+  ta.value=""; $("count").textContent="0 / 1000";
   $("writeDlg").close();
   showMine(true);
 };
