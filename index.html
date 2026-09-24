@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Unsigned</title>
+<title>One Chance</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -19,7 +19,10 @@ body{
   background:radial-gradient(ellipse at 30% 20%,var(--sky2),var(--sky1) 70%) fixed;
   overflow:hidden;-webkit-text-size-adjust:100%;
 }
-#space{position:fixed;inset:0;overflow:hidden}
+#space{position:fixed;inset:0;overflow:hidden;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+#space.grabbing{cursor:grabbing}
+#world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+#world.anim{transition:transform .7s cubic-bezier(.3,.7,.2,1)}
 .bubble{
   position:absolute;border-radius:50%;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
@@ -57,6 +60,7 @@ header p{margin:4px 0 0;color:var(--dim);font-size:14px;max-width:36ch;line-heig
 .actions button.write:hover{background:#f7d6b8}
 .actions button:not(.write):hover{background:#1b2d4a}
 .actions button.mineBtn{padding:6px 18px 6px 8px}
+.actions button.icon{width:46px;height:46px;padding:0;flex:none;border-radius:50%}
 button:focus-visible,textarea:focus-visible{outline:2px solid #fff;outline-offset:2px}
 [hidden]{display:none!important}
 
@@ -104,9 +108,15 @@ textarea{
 .stat b{display:block;font-size:22px;font-weight:600;color:var(--ink)}
 .stat span{font-size:12px;color:var(--dim)}
 .close-row{display:flex;justify-content:flex-end;margin-top:18px}
-.hero{display:flex;justify-content:center;margin:6px 0 10px}
-.hero svg{width:150px;height:150px;overflow:visible;animation:bob 2.4s ease-in-out infinite}
+.hero{display:flex;justify-content:center;margin:6px 0 10px;position:relative}
+.hero svg{width:150px;height:150px;overflow:visible;animation:bob 2.4s ease-in-out infinite;transition:filter .5s ease,transform .5s ease}
 .hero.new svg{animation:hop .9s cubic-bezier(.2,1.5,.4,1),bob 2.4s ease-in-out .9s infinite}
+.revealHint{color:var(--b1)!important;font-size:14px!important;margin:0 0 10px!important;transition:opacity .3s}
+.bigName{font-size:24px!important;font-weight:700;color:var(--ink)!important;margin:0 0 4px!important}
+.desc{color:var(--dim)!important;font-size:14px!important;margin:0 0 14px!important;transition:opacity .5s ease .1s}
+.bigName,#mineTier,#minePreview,#shareMine{transition:opacity .5s ease .1s}
+.confetti-piece{position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:2px;opacity:0;animation:confetti .9s ease-out forwards;pointer-events:none}
+@keyframes confetti{0%{opacity:1;transform:translate(-50%,-50%) rotate(var(--ang)) translateY(0) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) rotate(var(--ang)) translateY(-72px) scale(.3)}}
 @keyframes bob{50%{transform:translateY(-6px)}}
 @keyframes hop{from{transform:scale(0) rotate(-20deg)}to{transform:scale(1) rotate(0)}}
 #mineDlg h2,#mineDlg .center{text-align:center}
@@ -123,57 +133,105 @@ textarea{
   }
   .actions button{flex:1;padding:14px 12px}
   .actions button.mineBtn{padding:6px 12px}
+  .actions button.icon{flex:none;width:48px;height:48px;padding:0}
   dialog{padding:20px;border-radius:18px}
   #reader{font-size:18px}
   .stat b{font-size:19px}
 }
 @media (prefers-reduced-motion:reduce){
-  .bubble,.bubble.fresh,.hero svg,.hero.new svg{animation:none}
+  #world.anim{transition:none}
+  .bubble,.bubble.fresh,.hero svg,.hero.new svg,.confetti-piece{animation:none}
 }
+
+.actions button.icon{font-size:13px;font-weight:700;letter-spacing:.02em}
+.stats{grid-template-columns:1fr}
+.stat b{font-size:44px}
+details{border-top:1px solid var(--line)}
+details:last-of-type{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;padding:14px 0;font-size:15px;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-size:20px;font-weight:400;color:var(--dim)}
+details[open] summary::after{content:"\2013"}
+details>*:not(summary){margin-top:0}
+.ver{font-weight:400;font-size:13px;color:var(--dim)}
+#onboard{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(ellipse at 30% 20%,var(--sky2),var(--sky1) 75%)}
+.obCard{width:min(420px,100%);text-align:center}
+.obBubble{
+  width:150px;height:150px;margin:0 auto 26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:64px;font-weight:700;color:#0d1b2a;
+  background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.75),var(--c) 55%);box-shadow:0 0 50px -8px var(--c);
+  animation:bob 3s ease-in-out infinite
+}
+.obCard h2{font-size:26px;margin:0 0 10px}
+.obCard p{font-size:17px;line-height:1.5;color:var(--dim);margin:0 0 22px}
+.dots{display:flex;justify-content:center;gap:8px;margin-bottom:22px}
+.dots span{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.dots span.on{background:var(--ink)}
+.obCard .btns{justify-content:center}
+.obLang{position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:rgba(18,32,54,.7);color:var(--ink);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.obBubble{animation:none}}
+.tag{font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid var(--line);margin-left:6px;color:var(--dim);font-weight:400}
+.tag.tier1{color:var(--b3);border-color:var(--b3)}
+.tag.tier2{color:#ffd23f;border-color:#ffd23f}
+#mineTier{margin:0 0 12px!important;color:var(--ink)!important;font-size:15px!important}
 </style>
 </head>
 <body>
 <header>
   <div>
-    <h1>Unsigned<small>v1.3</small></h1>
-    <p>Anonymous thoughts, floating together. Nothing here has a name on it.</p>
+    <h1>One Chance<small>v1.6.0</small></h1>
+    <p data-i18n="tagline"></p>
   </div>
   <div class="actions">
-    <button id="openInfo" type="button">Information</button>
-    <button class="write" id="openWrite" type="button">Write your bubble</button>
-    <button class="mineBtn" id="openMine" type="button" hidden><span id="mineIcon"></span>My character</button>
+    <button id="langBtn" class="icon" type="button" data-i18n-aria="langAria">ES</button>
+    <button id="openStats" class="icon" type="button" data-i18n-aria="statsTitle"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="11"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="14"/></svg></button>
+    <button id="openInfo" class="icon" type="button" data-i18n-aria="infoTitle"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><line x1="12" y1="11" x2="12" y2="17"/><circle cx="12" cy="7.5" r=".6" fill="currentColor"/></svg></button>
+    <button class="write" id="openWrite" type="button" data-i18n="write"></button>
+    <button class="mineBtn" id="openMine" type="button" hidden><span id="mineIcon"></span><span data-i18n="mine"></span></button>
   </div>
 </header>
 
-<div id="space" aria-live="polite"></div>
-<div id="empty">It's quiet here.<br>Write the first bubble.</div>
+<div id="space"><div id="world"></div></div>
+<div id="empty" data-i18n-html="empty"></div>
 <div id="status"></div>
+
+<div id="onboard" hidden role="dialog" aria-modal="true" aria-labelledby="obTitle">
+  <button class="obLang" id="obLangBtn" type="button" data-i18n-aria="langAria">ES</button>
+  <div class="obCard">
+    <div class="obBubble" id="obBubble">#</div>
+    <h2 id="obTitle"></h2>
+    <p id="obText"></p>
+    <div class="dots" id="obDots"></div>
+    <div class="btns"><button id="obSkip" type="button" data-i18n="obSkip"></button><button id="obNext" class="go" type="button"></button></div>
+  </div>
+</div>
 
 <dialog id="writeDlg">
   <div id="stepWrite">
-    <h2>Write your bubble</h2>
-    <div class="warn"><b>You only have one chance.</b> Once you publish, your message can't be edited or deleted, and you can't write another. Think wisely about what you want to say, or you'll lose it.</div>
+    <h2 data-i18n="writeTitle"></h2>
+    <div class="warn" data-i18n-html="warn"></div>
     <p class="nextnum" id="nextNum" hidden></p>
-    <p>Say anything you like. It's anonymous. Don't include names, phone numbers, emails, usernames or links.</p>
-    <textarea id="text" maxlength="1000" placeholder="What's on your mind?"></textarea>
+    <p data-i18n="writeHelp"></p>
+    <textarea id="text" maxlength="1000" data-i18n-ph="placeholder"></textarea>
     <div class="err" id="err" role="alert"></div>
     <div class="row">
       <span class="count" id="count">0 / 1000</span>
       <div class="btns">
-        <button id="cancel" type="button">Cancel</button>
-        <button id="review" class="go" type="button">Continue</button>
+        <button id="cancel" type="button" data-i18n="cancel"></button>
+        <button id="review" class="go" type="button" data-i18n="cont"></button>
       </div>
     </div>
   </div>
   <div id="stepConfirm" hidden>
-    <h2>Publish this as your one chance?</h2>
+    <h2 data-i18n="confirmTitle"></h2>
     <p class="nextnum" id="nextNum2" hidden></p>
-    <p>After you publish, you can't change it or take it back.</p>
+    <p data-i18n="confirmText"></p>
     <p class="preview" id="preview"></p>
     <div class="err" id="err2" role="alert"></div>
     <div class="btns" style="justify-content:flex-end">
-      <button id="back" type="button">Go back and edit</button>
-      <button id="publish" class="go" type="button">Yes, publish it</button>
+      <button id="back" type="button" data-i18n="back"></button>
+      <button id="publish" class="go" type="button" data-i18n="publish"></button>
     </div>
   </div>
 </dialog>
@@ -181,58 +239,58 @@ textarea{
 <dialog id="mineDlg">
   <h2 id="mineTitle"></h2>
   <div class="hero" id="mineHero"></div>
+  <p class="center revealHint" id="revealHint" data-i18n="revealing" hidden></p>
   <p class="bigNum" id="mineNum"></p>
+  <p class="center bigName" id="mineName"></p>
+  <p class="center" id="mineTier"></p>
+  <p class="center desc" id="mineDesc"></p>
   <p class="center" id="mineText"></p>
   <p class="preview" id="minePreview"></p>
-  <div class="close-row"><div class="btns"><button id="closeMine" class="go" type="button">Close</button></div></div>
+  <div class="close-row"><div class="btns"><button id="shareMine" type="button" data-i18n="share"></button><button id="findMine" type="button" data-i18n="findMine"></button><button id="closeMine" class="go" type="button" data-i18n="close"></button></div></div>
 </dialog>
 
 <dialog id="readDlg">
   <div class="readTop"><b class="bigNum" id="readNum"></b><p class="when" id="when"></p></div>
   <p id="reader"></p>
-  <div class="btns"><button id="closeRead" type="button">Close</button></div>
+  <div class="btns"><button id="closeRead" type="button" data-i18n="close"></button></div>
+</dialog>
+
+<dialog id="statsDlg">
+  <h2 data-i18n="statsTitle"></h2>
+  <div class="stats"><div class="stat"><b id="sTotal">–</b><span data-i18n="statTotal"></span></div></div>
+  <div class="close-row"><div class="btns"><button id="closeStats" class="go" type="button" data-i18n="close"></button></div></div>
 </dialog>
 
 <dialog id="infoDlg">
-  <h2>Information <span style="font-weight:400;font-size:13px;color:var(--dim)">version 1.3</span></h2>
-
-  <h3>What is this project?</h3>
-  <p>Unsigned is a social experiment: a shared universe of anonymous bubbles. Anyone with the link can write a short message and publish it. Everyone sees the same bubbles, and nobody knows who wrote which one.</p>
-
-  <h3>What is the goal?</h3>
-  <p>To see what people say when there's no name, no profile and no fear of being recognized. The aim is to read honest, unfiltered thoughts from a group of people, and to let everyone speak freely and safely.</p>
-
-  <h3>How it works</h3>
-  <ul>
-    <li>You have one chance to publish, so choose your words wisely. Messages can be up to 1000 characters.</li>
-    <li>Every bubble shows its number, in the order it was published. When you publish, you earn a colorful character as a reward.</li>
-    <li>Only you can tell which bubble is yours: it gets a white ring on your device, and you can see your character anytime with the "My character" button.</li>
-    <li>The limit is per browser. There are no accounts, so it can't be enforced perfectly. Clearing your browser data or using another device would allow another post, so please keep it fair.</li>
-  </ul>
-
-  <h3>Stats</h3>
-  <div class="stats">
-    <div class="stat"><b id="sTotal">–</b><span>bubbles in total</span></div>
-    <div class="stat"><b id="sDay">–</b><span>in the last 24 hours</span></div>
-    <div class="stat"><b id="sFirst">–</b><span>first bubble</span></div>
+  <h2><span data-i18n="infoTitle"></span> <span class="ver">v1.6.0</span></h2>
+  <details open>
+    <summary data-i18n="aboutT"></summary>
+    <p data-i18n="aboutP"></p>
+  </details>
+  <details>
+    <summary data-i18n="howT"></summary>
+    <ul>
+      <li data-i18n="how1"></li><li data-i18n="how2"></li><li data-i18n="how3"></li><li data-i18n="how4"></li><li data-i18n="how5"></li>
+    </ul>
+  </details>
+  <details>
+    <summary data-i18n="privT"></summary>
+    <p data-i18n="privP"></p>
+  </details>
+  <details>
+    <summary data-i18n="rulesT"></summary>
+    <ul>
+      <li data-i18n="rule1"></li><li data-i18n="rule2"></li><li data-i18n="rule3"></li><li data-i18n="rule4"></li><li data-i18n="rule5"></li>
+    </ul>
+  </details>
+  <details>
+    <summary data-i18n="aiT"></summary>
+    <p data-i18n="aiP"></p>
+  </details>
+  <div class="close-row" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
+    <div class="btns"><button id="replayIntro" type="button" data-i18n="replay"></button></div>
+    <div class="btns"><button id="closeInfo" class="go" type="button" data-i18n="close"></button></div>
   </div>
-
-  <h3>Privacy</h3>
-  <p>This website doesn't ask for or store your name, email, phone number or any account. It has no login. Only the text of each bubble and the time it was published are saved online. Your own browser keeps a small note on your device saying you've posted, plus a copy of your bubble, so the site can remember you and show your character. Like any website, the hosting and database services may keep basic technical logs that this project doesn't control.</p>
-
-  <h3>Please read before writing</h3>
-  <ul>
-    <li>Don't share private information: no phone numbers, email addresses, usernames, social media accounts, links, or real names of people.</li>
-    <li>Bubbles can't be edited or deleted once published, so think before you post.</li>
-    <li>Messages that contain private information are blocked automatically, but the filter isn't perfect. You are responsible for what you write.</li>
-    <li>Be kind. Don't use this space to harass or threaten anyone.</li>
-    <li>Everything here is written by anonymous people. The project doesn't verify or endorse any bubble.</li>
-  </ul>
-
-  <h3>Made with AI</h3>
-  <p>This website was designed and built with the help of an AI assistant (Claude, by Anthropic).</p>
-
-  <div class="close-row"><div class="btns"><button id="closeInfo" class="go" type="button">Close</button></div></div>
 </dialog>
 
 <script>
@@ -245,15 +303,289 @@ const MAX_BUBBLES = 200;
 const STORE_KEY = "unsigned_mine";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
-const space = $("space");
 const colors = ["--b1","--b2","--b3","--b4","--b5"];
 const seen = new Set();
+const els = new Map();
+
+/* ---------- pan and zoom ---------- */
+const world = $("world");
+let view = {x:0,y:0,s:1}, W = innerWidth, H = innerHeight, moved = false;
+const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
+const minScale = ()=>clamp(Math.min(innerWidth/W, innerHeight/H), .1, 1);
+function clampView(){
+  view.s = clamp(view.s, minScale(), 2.5);
+  const w = W*view.s, h = H*view.s;
+  view.x = w<=innerWidth ? (innerWidth-w)/2 : clamp(view.x, innerWidth-w, 0);
+  view.y = h<=innerHeight ? (innerHeight-h)/2 : clamp(view.y, innerHeight-h, 0);
+}
+function applyView(){ world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.s})`; }
+function sizeWorld(){ // the universe grows as more bubbles are added
+  const g = clamp(Math.round(Math.sqrt(seen.size/8)*4)/4, 1, 6);
+  W = Math.round(innerWidth*g); H = Math.round(innerHeight*g);
+  world.style.width = W+"px"; world.style.height = H+"px";
+  clampView(); applyView();
+}
+function centerView(){ view.s = 1; view.x = (innerWidth-W)/2; view.y = (innerHeight-H)/2; clampView(); applyView(); }
+function centerOn(el){
+  if(!el) return;
+  world.classList.add("anim");
+  view.s = Math.max(view.s, 1);
+  view.x = innerWidth/2 - (el.offsetLeft + el.offsetWidth/2)*view.s;
+  view.y = innerHeight/2 - (el.offsetTop + el.offsetHeight/2)*view.s;
+  clampView(); applyView();
+  setTimeout(()=>world.classList.remove("anim"), 750);
+}
+function zoomAt(cx,cy,ns){
+  const wx = (cx-view.x)/view.s, wy = (cy-view.y)/view.s;
+  view.s = clamp(ns, minScale(), 2.5);
+  view.x = cx - wx*view.s; view.y = cy - wy*view.s;
+  clampView(); applyView();
+}
+const space = $("space");
+const ptrs = new Map();
+let drag = null, pinch = null;
+const two = ()=>{ const [a,b] = [...ptrs.values()]; return {mx:(a.x+b.x)/2, my:(a.y+b.y)/2, d:Math.hypot(a.x-b.x,a.y-b.y)||1}; };
+space.addEventListener("pointerdown", e=>{
+  if(e.pointerType==="mouse" && e.button!==0) return;
+  world.classList.remove("anim");
+  ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(ptrs.size===1){ moved = false; drag = {x:e.clientX, y:e.clientY, sx:e.clientX, sy:e.clientY}; }
+  else if(ptrs.size===2){
+    moved = true; drag = null;
+    const t = two(); pinch = {d:t.d, s:view.s, wx:(t.mx-view.x)/view.s, wy:(t.my-view.y)/view.s};
+  }
+});
+window.addEventListener("pointermove", e=>{
+  const p = ptrs.get(e.pointerId); if(!p) return;
+  p.x = e.clientX; p.y = e.clientY;
+  if(ptrs.size===2 && pinch){
+    const t = two();
+    view.s = clamp(pinch.s*t.d/pinch.d, minScale(), 2.5);
+    view.x = t.mx - pinch.wx*view.s; view.y = t.my - pinch.wy*view.s;
+    clampView(); applyView(); return;
+  }
+  if(ptrs.size===1 && drag){
+    if(!moved){
+      if(Math.hypot(e.clientX-drag.sx, e.clientY-drag.sy) < 6) return;
+      moved = true; space.classList.add("grabbing"); drag.x = e.clientX; drag.y = e.clientY;
+    }
+    view.x += e.clientX-drag.x; view.y += e.clientY-drag.y;
+    drag.x = e.clientX; drag.y = e.clientY;
+    clampView(); applyView();
+  }
+});
+function endPtr(e){
+  if(!ptrs.delete(e.pointerId)) return;
+  pinch = null;
+  if(ptrs.size===1){ const r = [...ptrs.values()][0]; drag = {x:r.x, y:r.y, sx:r.x, sy:r.y}; }
+  else if(ptrs.size===0){ drag = null; space.classList.remove("grabbing"); }
+}
+window.addEventListener("pointerup", endPtr);
+window.addEventListener("pointercancel", endPtr);
+space.addEventListener("wheel", e=>{
+  e.preventDefault();
+  world.classList.remove("anim");
+  zoomAt(e.clientX, e.clientY, view.s*Math.exp(-e.deltaY*(e.ctrlKey ? .01 : .0015)));
+},{passive:false});
+document.addEventListener("gesturestart", e=>e.preventDefault()); // stop iOS page zoom
+window.addEventListener("resize", sizeWorld);
+
+
+/* ---------- languages (English is the default) ---------- */
+const T = {
+en:{
+  tagline:"Anonymous thoughts, floating together. Nothing here has a name on it.",
+  write:"Write your bubble", mine:"My character", infoTitle:"Information", statsTitle:"Stats", langAria:"Español",
+  empty:"It's quiet here.<br>Write the first bubble.",
+  writeTitle:"Write your bubble",
+  warn:"<b>You only have one chance.</b> Once you publish, your message can't be edited or deleted, and you can't write another. Think wisely about what you want to say, or you'll lose it.",
+  writeHelp:"Say anything you like. It's anonymous. Don't include names, phone numbers, emails, usernames or links.",
+  placeholder:"What's on your mind?", cancel:"Cancel", cont:"Continue",
+  confirmTitle:"Publish this as your one chance?", confirmText:"After you publish, you can't change it or take it back.",
+  back:"Go back and edit", publish:"Yes, publish it", next:"You're writing bubble #{n}", bubble:"Bubble",
+  earned:"You earned a character!", yours:"Your character",
+  earnedText:"It's yours to keep on this device. Nobody else can tell which bubble is yours.",
+  usedText:"You've used your one chance. Look for the white ring around your bubble in the universe.",
+  findMine:"Show my bubble", close:"Close",
+  statTotal:"bubbles in total",
+  aboutT:"About", aboutP:"One Chance is a social experiment. Anyone with the link can publish one anonymous message. Everyone sees the same bubbles, and nobody knows who wrote which. The goal: honest thoughts, without fear of being recognized.",
+  howT:"How it works",
+  how1:"You have one chance to publish. Messages can be up to 1000 characters.",
+  how2:"Every bubble shows its number, in the order it was published.",
+  how3:"After publishing you earn a character. Your bubble gets a white ring on your device.",
+  how4:"Drag to move around. Pinch or scroll to zoom.",
+  how5:"The limit is per browser. Clearing your data or using another device would allow another post, so please keep it fair.",
+  privT:"Privacy", privP:"No login, and no name, email or phone number is asked for. Only the text and time of each bubble are saved online. Your browser keeps a small note on your device that you've posted, plus a copy of your bubble. Hosting and database services may keep basic technical logs outside this project's control.",
+  rulesT:"Before you write",
+  rule1:"Don't share private information: phone numbers, emails, usernames, social accounts, links or real names.",
+  rule2:"Bubbles can't be edited or deleted once published.",
+  rule3:"Private information is blocked automatically, but the filter isn't perfect. You are responsible for what you write.",
+  rule4:"Be kind. No harassment or threats.",
+  rule5:"Bubbles are written by anonymous people and aren't verified or endorsed.",
+  aiT:"Made with AI", aiP:"This website was designed and built with the help of an AI assistant (Claude, by Anthropic).",
+  replay:"See the intro again",
+  ob1T:"Welcome to One Chance", ob1P:"A universe of anonymous messages, each one a bubble.",
+  ob2T:"You get one chance", ob2P:"Write one message. No edits. No deleting.",
+  ob3T:"Stay anonymous", ob3P:"No names, phones or emails. Just your thoughts.",
+  obSkip:"Skip", obNext:"Next", obEnter:"Enter the space",
+  writeFirst:"Write something first.",
+  remove:"Please remove {list}. This space is for anonymous thoughts only.",
+  chk_email:"email addresses", chk_handle:"usernames (@something)", chk_phone:"phone numbers or long numbers", chk_link:"links", chk_social:"social media accounts", chk_name:"names",
+  pubPrivate:"That looks like it contains private information. Go back and rephrase. Your chance isn't used yet.",
+  pubFail:"Couldn't publish. Your chance isn't used yet, so try again in a moment.",
+  loadErr:"Couldn't load bubbles. Check your Supabase URL and key.",
+  hint:"Drag to explore. Pinch or scroll to zoom.",
+  sp0:"Blob", sp1:"Cube", sp2:"Egg", sp3:"Drop", sp4:"Ghost", sp5:"Cat", sp6:"Bunny", sp7:"Bear", sp8:"Robot", sp9:"Mushroom", sp10:"Octopus", sp11:"Alien", sp12:"Star", sp13:"Cloud",
+  sp14:"Turtle", sp15:"Fox", sp16:"Drone", sp17:"Butterfly", sp18:"Crab", sp19:"Jellyfish", sp20:"Dragon", sp21:"Snail", sp22:"Cactus", sp23:"Owl",
+  tier0:"Common", tier1:"Rare", tier2:"Golden",
+  nm0:"Blot", nm1:"Cubi", nm2:"Yolko", nm3:"Dewy", nm4:"Boo", nm5:"Miso", nm6:"Hops", nm7:"Bruno", nm8:"Byte", nm9:"Spore", nm10:"Inky", nm11:"Zeeb", nm12:"Twinkle", nm13:"Puff",
+  nm14:"Turt", nm15:"Finn", nm16:"Volt", nm17:"Wisp", nm18:"Pinch", nm19:"Bloop", nm20:"Ember", nm21:"Shelby", nm22:"Prickle", nm23:"Hoot",
+  ds0:"A shapeless little dreamer — {time} passed before {len} characters finally took form.",
+  ds1:"Boxed-in and precise, arranged {len} characters just so in {time}.",
+  ds2:"Fragile and hopeful, cracked open after {time} to let {len} characters out.",
+  ds3:"A single drop that took {time} to fall, carrying {len} characters with it.",
+  ds4:"Quiet and a little shy — floated in after {time}, whispering {len} characters.",
+  ds5:"Curious and a bit picky, circled the idea for {time} before {len} characters landed.",
+  ds6:"Jumpy and quick — needed only {time} to hop out {len} characters.",
+  ds7:"Warm and unhurried, took {time} to lumber through {len} characters.",
+  ds8:"Calculated every word — {time} of processing produced exactly {len} characters.",
+  ds9:"Grew slowly in the dark for {time} before {len} characters sprouted.",
+  ds10:"Juggled a dozen ideas at once, settling on {len} characters after {time}.",
+  ds11:"Beamed down some very earthly thoughts — {len} characters after {time} orbiting the topic.",
+  ds12:"Burned bright and fast, sparking {len} characters in just {time}.",
+  ds13:"Drifted along, letting {len} characters gather over {time}.",
+  ds14:"Slow and steady — spent {time} carefully writing {len} characters, one word at a time.",
+  ds15:"Sly and sharp, slipped out {len} characters in just {time}.",
+  ds16:"Buzzed with focus, executing {len} characters after {time} of quiet whirring.",
+  ds17:"Flitted between thoughts for {time} before settling on {len} characters.",
+  ds18:"Guarded and careful, sidestepped the topic for {time} before pinching out {len} characters.",
+  ds19:"Drifted with the current, letting {len} characters wash out after {time}.",
+  ds20:"Fierce but patient, breathed {time} of thought into {len} fiery characters.",
+  ds21:"Took its time — a full {time} to leave a trail of {len} characters.",
+  ds22:"Prickly on the outside, needed {time} to soften up and share {len} characters.",
+  ds23:"Wide awake and watchful, stayed up {time} thinking before {len} characters.",
+  share:"Share", shareCta:"Try your own chance at", linkCopied:"Link copied!", revealing:"Revealing your character...",
+  shareFail:"Couldn't share. Try again."
+},
+es:{
+  tagline:"Pensamientos anónimos, flotando juntos. Aquí nada lleva nombre.",
+  write:"Escribe tu burbuja", mine:"Mi personaje", infoTitle:"Información", statsTitle:"Estadísticas", langAria:"English",
+  empty:"Aquí hay silencio.<br>Escribe la primera burbuja.",
+  writeTitle:"Escribe tu burbuja",
+  warn:"<b>Solo tienes una oportunidad.</b> Una vez publicado, tu mensaje no se puede editar ni borrar, y no podrás escribir otro. Piensa bien lo que quieres decir, o lo perderás.",
+  writeHelp:"Di lo que quieras. Es anónimo. No incluyas nombres, teléfonos, correos, nombres de usuario ni enlaces.",
+  placeholder:"¿Qué tienes en mente?", cancel:"Cancelar", cont:"Continuar",
+  confirmTitle:"¿Publicar esto como tu única oportunidad?", confirmText:"Después de publicar, no podrás cambiarlo ni retirarlo.",
+  back:"Volver y editar", publish:"Sí, publicar", next:"Estás escribiendo la burbuja #{n}", bubble:"Burbuja",
+  earned:"¡Ganaste un personaje!", yours:"Tu personaje",
+  earnedText:"Es tuyo y se queda en este dispositivo. Nadie más puede saber cuál burbuja es la tuya.",
+  usedText:"Ya usaste tu única oportunidad. Busca el aro blanco alrededor de tu burbuja en el universo.",
+  findMine:"Ver mi burbuja", close:"Cerrar",
+  statTotal:"burbujas en total",
+  aboutT:"Acerca de", aboutP:"One Chance es un experimento social. Cualquiera con el enlace puede publicar un mensaje anónimo. Todos ven las mismas burbujas y nadie sabe quién escribió cuál. El objetivo: pensamientos honestos, sin miedo a ser reconocido.",
+  howT:"Cómo funciona",
+  how1:"Tienes una oportunidad para publicar. Los mensajes pueden tener hasta 1000 caracteres.",
+  how2:"Cada burbuja muestra su número, en el orden en que se publicó.",
+  how3:"Al publicar ganas un personaje. Tu burbuja tiene un aro blanco en tu dispositivo.",
+  how4:"Arrastra para moverte. Pellizca o usa la rueda para hacer zoom.",
+  how5:"El límite es por navegador. Borrar tus datos o usar otro dispositivo permitiría otra publicación, así que por favor sé justo.",
+  privT:"Privacidad", privP:"No hay inicio de sesión ni se pide nombre, correo o teléfono. Solo se guarda en línea el texto y la hora de cada burbuja. Tu navegador guarda una pequeña nota en tu dispositivo de que ya publicaste, y una copia de tu burbuja. Los servicios de alojamiento y base de datos pueden guardar registros técnicos básicos fuera del control de este proyecto.",
+  rulesT:"Antes de escribir",
+  rule1:"No compartas información privada: teléfonos, correos, nombres de usuario, cuentas de redes sociales, enlaces o nombres reales.",
+  rule2:"Las burbujas no se pueden editar ni borrar una vez publicadas.",
+  rule3:"La información privada se bloquea automáticamente, pero el filtro no es perfecto. Eres responsable de lo que escribes.",
+  rule4:"Sé amable. Nada de acoso ni amenazas.",
+  rule5:"Las burbujas las escriben personas anónimas y no están verificadas ni respaldadas.",
+  aiT:"Hecho con IA", aiP:"Este sitio web fue diseñado y creado con la ayuda de un asistente de IA (Claude, de Anthropic).",
+  replay:"Ver la introducción otra vez",
+  ob1T:"Bienvenido a One Chance", ob1P:"Un universo de mensajes anónimos, cada uno una burbuja.",
+  ob2T:"Tienes una oportunidad", ob2P:"Escribe un solo mensaje. Sin editar. Sin borrar.",
+  ob3T:"Sigue siendo anónimo", ob3P:"Sin nombres, teléfonos ni correos. Solo tus pensamientos.",
+  obSkip:"Omitir", obNext:"Siguiente", obEnter:"Entrar al espacio",
+  writeFirst:"Escribe algo primero.",
+  remove:"Por favor quita {list}. Este espacio es solo para pensamientos anónimos.",
+  chk_email:"correos electrónicos", chk_handle:"nombres de usuario (@algo)", chk_phone:"teléfonos o números largos", chk_link:"enlaces", chk_social:"cuentas de redes sociales", chk_name:"nombres",
+  pubPrivate:"Parece contener información privada. Vuelve y reescríbelo. Tu oportunidad aún no se ha usado.",
+  pubFail:"No se pudo publicar. Tu oportunidad aún no se ha usado; inténtalo de nuevo en un momento.",
+  loadErr:"No se pudieron cargar las burbujas. Revisa tu URL y clave de Supabase.",
+  hint:"Arrastra para explorar. Pellizca o usa la rueda para hacer zoom.",
+  sp0:"Blob", sp1:"Cubo", sp2:"Huevo", sp3:"Gota", sp4:"Fantasma", sp5:"Gato", sp6:"Conejo", sp7:"Oso", sp8:"Robot", sp9:"Hongo", sp10:"Pulpo", sp11:"Alienígena", sp12:"Estrella", sp13:"Nube",
+  sp14:"Tortuga", sp15:"Zorro", sp16:"Dron", sp17:"Mariposa", sp18:"Cangrejo", sp19:"Medusa", sp20:"Dragón", sp21:"Caracol", sp22:"Cactus", sp23:"Búho",
+  tier0:"Común", tier1:"Raro", tier2:"Dorado",
+  nm0:"Blot", nm1:"Cubi", nm2:"Yolko", nm3:"Dewy", nm4:"Boo", nm5:"Miso", nm6:"Hops", nm7:"Bruno", nm8:"Byte", nm9:"Spore", nm10:"Inky", nm11:"Zeeb", nm12:"Twinkle", nm13:"Puff",
+  nm14:"Turt", nm15:"Finn", nm16:"Volt", nm17:"Wisp", nm18:"Pinch", nm19:"Bloop", nm20:"Ember", nm21:"Shelby", nm22:"Prickle", nm23:"Hoot",
+  ds0:"Un soñador sin forma fija: pasaron {time} antes de que {len} caracteres tomaran forma.",
+  ds1:"Ordenado y preciso, acomodó {len} caracteres en {time}.",
+  ds2:"Frágil y esperanzado, se abrió tras {time} para dejar salir {len} caracteres.",
+  ds3:"Una sola gota que tardó {time} en caer, con {len} caracteres dentro.",
+  ds4:"Tímido y callado, llegó flotando tras {time}, susurrando {len} caracteres.",
+  ds5:"Curioso y exigente, dio vueltas a la idea {time} antes de que {len} caracteres aterrizaran.",
+  ds6:"Saltarín y rápido, solo necesitó {time} para soltar {len} caracteres.",
+  ds7:"Cálido y sin prisa, tardó {time} en recorrer {len} caracteres.",
+  ds8:"Calculó cada palabra: {time} de proceso dieron exactamente {len} caracteres.",
+  ds9:"Creció despacio en la sombra durante {time} antes de que brotaran {len} caracteres.",
+  ds10:"Hizo malabares con varias ideas y se quedó con {len} caracteres tras {time}.",
+  ds11:"Transmitió pensamientos muy terrícolas: {len} caracteres después de {time} orbitando el tema.",
+  ds12:"Brilló rápido y fuerte, encendió {len} caracteres en solo {time}.",
+  ds13:"Flotó sin prisa, dejando que {len} caracteres se juntaran durante {time}.",
+  ds14:"Lento y constante: se tomó {time} para escribir con cuidado {len} caracteres, uno a uno.",
+  ds15:"Astuto y ágil, soltó {len} caracteres en apenas {time}.",
+  ds16:"Zumbó con enfoque, ejecutó {len} caracteres tras {time} de zumbido silencioso.",
+  ds17:"Revoloteó entre ideas durante {time} antes de posarse en {len} caracteres.",
+  ds18:"Cauteloso, esquivó el tema durante {time} antes de pellizcar {len} caracteres.",
+  ds19:"Se dejó llevar por la corriente, soltando {len} caracteres tras {time}.",
+  ds20:"Feroz pero paciente, sopló {time} de pensamiento en {len} caracteres ardientes.",
+  ds21:"Se tomó su tiempo: {time} completos para dejar un rastro de {len} caracteres.",
+  ds22:"Espinoso por fuera, necesitó {time} para ablandarse y compartir {len} caracteres.",
+  ds23:"Bien despierto y atento, se quedó pensando {time} antes de {len} caracteres.",
+  share:"Compartir", shareCta:"Prueba tu propia oportunidad en", linkCopied:"¡Enlace copiado!", revealing:"Revelando tu personaje...",
+  shareFail:"No se pudo compartir. Intenta de nuevo."
+}};
+let lang = "en";
+try{ const l = localStorage.getItem("oc_lang"); if(l==="es"||l==="en") lang = l; }catch(e){}
+const t = (k,v)=>{ let x = (T[lang][k] ?? T.en[k] ?? k); if(v) for(const n in v) x = x.replace("{"+n+"}", v[n]); return x; };
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i18n]").forEach(e=>e.textContent = t(e.dataset.i18n));
+  document.querySelectorAll("[data-i18n-html]").forEach(e=>e.innerHTML = t(e.dataset.i18nHtml));
+  document.querySelectorAll("[data-i18n-ph]").forEach(e=>e.placeholder = t(e.dataset.i18nPh));
+  document.querySelectorAll("[data-i18n-aria]").forEach(e=>{ const v = t(e.dataset.i18nAria); e.setAttribute("aria-label",v); e.title = v; });
+  const other = lang==="en" ? "ES" : "EN";
+  $("langBtn").textContent = other; $("obLangBtn").textContent = other;
+}
+function toggleLang(){
+  lang = lang==="en" ? "es" : "en";
+  try{ localStorage.setItem("oc_lang",lang); }catch(e){}
+  applyLang(); if(!$("onboard").hidden) renderOb();
+}
+$("langBtn").onclick = toggleLang; $("obLangBtn").onclick = toggleLang;
+
+/* ---------- onboarding ---------- */
+const SLIDES = [["#","--b1","ob1"],["1","--b2","ob2"],["?","--b3","ob3"]];
+let obI = 0;
+function renderOb(){
+  const [sym,c,k] = SLIDES[obI], last = obI===SLIDES.length-1;
+  $("obBubble").textContent = sym; $("obBubble").style.setProperty("--c",`var(${c})`);
+  $("obTitle").textContent = t(k+"T"); $("obText").textContent = t(k+"P");
+  $("obDots").innerHTML = SLIDES.map((_,i)=>`<span class="${i===obI?"on":""}"></span>`).join("");
+  $("obNext").textContent = last ? t("obEnter") : t("obNext");
+  $("obSkip").hidden = last;
+}
+function openOb(){ obI = 0; $("onboard").hidden = false; renderOb(); $("obNext").focus(); }
+function closeOb(){ $("onboard").hidden = true; try{ localStorage.setItem("oc_intro","1"); }catch(e){} }
+$("obNext").onclick = ()=>{ if(obI<SLIDES.length-1){ obI++; renderOb(); } else closeOb(); };
+$("obSkip").onclick = closeOb;
+$("replayIntro").onclick = ()=>{ $("infoDlg").close(); openOb(); };
+document.querySelectorAll("#infoDlg details").forEach(d=>d.addEventListener("toggle",()=>{
+  if(d.open) document.querySelectorAll("#infoDlg details").forEach(o=>{ if(o!==d) o.open = false; });
+}));
 
 /* ---------- this device's one bubble ---------- */
 let mine = null;
 try{ mine = JSON.parse(localStorage.getItem(STORE_KEY)); }catch(e){}
-function saveMine(row){
-  mine = {id:row.id, num:row.num, body:row.body, created_at:row.created_at};
+function saveMine(row, stats){
+  mine = {id:row.id, num:row.num, body:row.body, created_at:row.created_at,
+          elapsedMs: stats ? stats.elapsedMs : 0, len: stats ? stats.len : row.body.length};
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(mine)); }catch(e){}
   refreshButtons();
 }
@@ -268,71 +600,213 @@ function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.im
 function rnd(seed,n){return ((Math.sin(seed+n)*10000)%1+1)%1}
 function rng(seed){return ()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
-function critter(id, px){
+const BODY = ["#ff8fa3","#ffd166","#06d6a0","#4cc9f0","#b388ff","#ff9f68","#7bd88f","#f78fb3","#5eead4","#fca5a5","#93c5fd","#fde68a","#c4b5fd","#86efac"];
+const ACCENT = ["#ef476f","#118ab2","#ffb703","#8338ec","#2ec4b6","#fb5607","#e11d48","#0ea5e9"];
+const INK = "#1b2a49";
+const EYES = ["dots","big","cyclops","happy","sleepy","wink","sparkle","shiny","star","hearts"];
+const MOUTHS = ["smile","open","o","cat","tongue","fang","flat","grin"];
+const HATS = ["none","none","antenna","ears","horns","sprout","crown","round","halo","party","ribbon","beanie","flower","mask"];
+const starPts = (cx,cy,R,r,n)=>{ const p=[]; for(let i=0;i<n*2;i++){ const a=-Math.PI/2+i*Math.PI/n, d=i%2?r:R; p.push((cx+Math.cos(a)*d).toFixed(1)+","+(cy+Math.sin(a)*d).toFixed(1)); } return p.join(" "); };
+const sparkle = (x,y,s,f)=>`<path d="M${x} ${y-s}L${x+s*.28} ${y-s*.28}L${x+s} ${y}L${x+s*.28} ${y+s*.28}L${x} ${y+s}L${x-s*.28} ${y+s*.28}L${x-s} ${y}L${x-s*.28} ${y-s*.28}Z" fill="${f}"/>`;
+
+/* 24 kinds of characters. ey/my = eye and mouth height, ty = top of head (for hats) */
+const SPECIES = [
+ {ey:52,my:68,ty:20,hat:1,body:f=>`<circle cx="50" cy="58" r="38" fill="${f}"/>`},
+ {ey:52,my:68,ty:27,hat:1,body:f=>`<rect x="19" y="27" width="62" height="62" rx="22" fill="${f}"/>`},
+ {ey:54,my:70,ty:18,hat:1,body:f=>`<ellipse cx="50" cy="58" rx="32" ry="40" fill="${f}"/>`},
+ {ey:64,my:80,ty:14,hat:1,body:f=>`<path d="M50 14C78 40 84 58 72 76C62 90 38 90 28 76C16 58 22 40 50 14Z" fill="${f}"/>`},
+ {ey:46,my:62,ty:16,hat:1,body:f=>`<path d="M20 90V50C20 28 34 16 50 16C66 16 80 28 80 50V90L70 82L60 90L50 82L40 90L30 82Z" fill="${f}"/>`},
+ {ey:54,my:68,ty:28,hat:0,
+  back:(f,a)=>`<polygon points="17,42 21,8 46,28" fill="${f}"/><polygon points="83,42 79,8 54,28" fill="${f}"/><polygon points="24,33 25,17 37,27" fill="${a}"/><polygon points="76,33 75,17 63,27" fill="${a}"/>`,
+  body:f=>`<ellipse cx="50" cy="60" rx="37" ry="32" fill="${f}"/>`,
+  front:(f,a,k)=>`<path d="M8 60L27 62M8 70L27 68M92 60L73 62M92 70L73 68" stroke="${k}" stroke-width="2" stroke-linecap="round" fill="none"/><polygon points="46,60 54,60 50,65" fill="#ff6b8b"/>`},
+ {ey:58,my:73,ty:40,hat:0,
+  back:(f,a)=>`<ellipse cx="36" cy="22" rx="9" ry="22" fill="${f}" transform="rotate(-8 36 22)"/><ellipse cx="64" cy="22" rx="9" ry="22" fill="${f}" transform="rotate(8 64 22)"/><ellipse cx="36" cy="24" rx="4" ry="15" fill="${a}" opacity=".7" transform="rotate(-8 36 24)"/><ellipse cx="64" cy="24" rx="4" ry="15" fill="${a}" opacity=".7" transform="rotate(8 64 24)"/>`,
+  body:f=>`<ellipse cx="50" cy="63" rx="33" ry="30" fill="${f}"/>`,
+  front:(f,a,k)=>`<rect x="45.5" y="79" width="4.5" height="7" rx="1.5" fill="#fff" stroke="${k}" stroke-width="1.4"/><rect x="50" y="79" width="4.5" height="7" rx="1.5" fill="#fff" stroke="${k}" stroke-width="1.4"/>`},
+ {ey:54,my:71,ty:26,hat:0,
+  back:(f,a)=>`<circle cx="22" cy="30" r="12" fill="${f}"/><circle cx="78" cy="30" r="12" fill="${f}"/><circle cx="22" cy="30" r="6" fill="${a}" opacity=".7"/><circle cx="78" cy="30" r="6" fill="${a}" opacity=".7"/>`,
+  body:f=>`<circle cx="50" cy="60" r="34" fill="${f}"/>`,
+  mid:(f,a,k)=>`<ellipse cx="50" cy="68" rx="15" ry="12" fill="#fff" opacity=".5"/><ellipse cx="50" cy="63" rx="5" ry="3.5" fill="${k}"/>`},
+ {ey:52,my:62,ty:30,hat:0,ink:"#8ff3ff",plain:1,
+  back:(f,a)=>`<line x1="50" y1="30" x2="50" y2="15" stroke="#1b2a49" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="11" r="5" fill="${a}"/><rect x="11" y="50" width="9" height="18" rx="3" fill="${a}"/><rect x="80" y="50" width="9" height="18" rx="3" fill="${a}"/>`,
+  body:f=>`<rect x="20" y="30" width="60" height="58" rx="12" fill="${f}"/>`,
+  mid:()=>`<rect x="27" y="38" width="46" height="42" rx="9" fill="#12233f"/>`},
+ {ey:64,my:78,ty:12,hat:0,nopat:1,
+  body:f=>`<rect x="28" y="46" width="44" height="48" rx="16" fill="#f8efdc"/><path d="M8 58C8 28 27 12 50 12C73 12 92 28 92 58Z" fill="${f}"/>`,
+  mid:()=>`<circle cx="28" cy="36" r="7" fill="#fff" opacity=".9"/><circle cx="58" cy="26" r="6" fill="#fff" opacity=".9"/><circle cx="76" cy="44" r="5" fill="#fff" opacity=".9"/><circle cx="46" cy="44" r="4" fill="#fff" opacity=".9"/>`},
+ {ey:46,my:62,ty:14,hat:1,body:f=>`<path d="M18 60C18 30 32 14 50 14C68 14 82 30 82 60C82 72 80 80 74 84C72 92 64 92 62 84C60 94 52 94 50 86C48 94 40 94 38 84C36 92 28 92 26 84C20 80 18 72 18 60Z" fill="${f}"/>`},
+ {ey:50,my:72,ty:18,hat:0,eyes:"oval",
+  back:(f,a)=>`<line x1="38" y1="22" x2="30" y2="6" stroke="#1b2a49" stroke-width="3" stroke-linecap="round"/><line x1="62" y1="22" x2="70" y2="6" stroke="#1b2a49" stroke-width="3" stroke-linecap="round"/><circle cx="30" cy="5" r="5" fill="${a}"/><circle cx="70" cy="5" r="5" fill="${a}"/>`,
+  body:f=>`<path d="M50 18C78 18 90 40 80 62C74 76 64 88 50 88C36 88 26 76 20 62C10 40 22 18 50 18Z" fill="${f}"/>`},
+ {ey:52,my:67,ty:10,hat:0,body:f=>`<polygon points="${starPts(50,54,44,24,5)}" fill="${f}" stroke="${f}" stroke-width="8" stroke-linejoin="round"/>`},
+ {ey:60,my:76,ty:22,hat:1,body:f=>`<circle cx="30" cy="62" r="20" fill="${f}"/><circle cx="52" cy="44" r="26" fill="${f}"/><circle cx="74" cy="60" r="22" fill="${f}"/><rect x="18" y="62" width="72" height="28" rx="14" fill="${f}"/>`},
+ {ey:56,my:72,ty:24,hat:1,body:f=>`<ellipse cx="50" cy="55" rx="34" ry="26" fill="${f}"/><ellipse cx="50" cy="88" rx="26" ry="14" fill="${f}" opacity=".85"/>`},
+ {ey:52,my:68,ty:16,hat:0,
+  back:(f,a)=>`<polygon points="24,30 14,4 42,22" fill="${f}"/><polygon points="76,30 86,4 58,22" fill="${f}"/><polygon points="27,26 22,10 38,21" fill="${a}"/><polygon points="73,26 78,10 62,21" fill="${a}"/>`,
+  body:f=>`<circle cx="50" cy="58" r="36" fill="${f}"/>`,
+  front:()=>`<ellipse cx="50" cy="76" rx="16" ry="11" fill="#fff" opacity=".85"/>`},
+ {ey:50,my:66,ty:22,hat:0,ink:"#8ff3ff",
+  back:(f,a)=>`<rect x="46" y="10" width="8" height="14" fill="#9fb0c8"/><circle cx="50" cy="8" r="5" fill="${a}"/>`,
+  body:f=>`<rect x="18" y="24" width="64" height="66" rx="14" fill="${f}"/>`,
+  mid:()=>`<rect x="26" y="34" width="48" height="34" rx="8" fill="#12233f" opacity=".9"/>`},
+ {ey:56,my:70,ty:30,hat:1,
+  back:(f,a)=>`<ellipse cx="24" cy="46" rx="20" ry="28" fill="${f}" transform="rotate(-20 24 46)"/><ellipse cx="76" cy="46" rx="20" ry="28" fill="${f}" transform="rotate(20 76 46)"/><ellipse cx="24" cy="46" rx="9" ry="14" fill="${a}" opacity=".6" transform="rotate(-20 24 46)"/><ellipse cx="76" cy="46" rx="9" ry="14" fill="${a}" opacity=".6" transform="rotate(20 76 46)"/>`,
+  body:f=>`<ellipse cx="50" cy="60" rx="16" ry="30" fill="${f}"/>`},
+ {ey:56,my:70,ty:34,hat:0,
+  body:f=>`<ellipse cx="50" cy="62" rx="38" ry="26" fill="${f}"/>`,
+  front:(f,a)=>`<path d="M14 60Q4 50 8 38" stroke="${f}" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M86 60Q96 50 92 38" stroke="${f}" stroke-width="8" fill="none" stroke-linecap="round"/><circle cx="7" cy="36" r="7" fill="${a}"/><circle cx="93" cy="36" r="7" fill="${a}"/>`},
+ {ey:48,my:62,ty:20,hat:0,
+  body:f=>`<path d="M14 50C14 22 30 8 50 8C70 8 86 22 86 50C86 58 78 62 50 62C22 62 14 58 14 50Z" fill="${f}"/>`,
+  front:(f)=>`<path d="M26 62Q24 80 30 92M40 62Q39 84 44 96M60 62Q61 84 56 96M74 62Q76 80 70 92" stroke="${f}" stroke-width="4" fill="none" stroke-linecap="round" opacity=".8"/>`},
+ {ey:54,my:70,ty:16,hat:0,
+  back:(f,a)=>`<polygon points="42,14 48,2 54,14" fill="${a}"/><polygon points="54,16 60,4 66,16" fill="${a}"/>`,
+  body:f=>`<circle cx="50" cy="58" r="36" fill="${f}"/>`,
+  front:(f,a,k)=>`<circle cx="42" cy="72" r="1.6" fill="${k}" opacity=".5"/><circle cx="58" cy="72" r="1.6" fill="${k}" opacity=".5"/>`},
+ {ey:58,my:74,ty:20,hat:0,
+  back:(f,a)=>`<circle cx="50" cy="28" r="22" fill="${a}"/>`,
+  body:f=>`<ellipse cx="46" cy="78" rx="40" ry="18" fill="${f}"/>`,
+  front:(f,a,k)=>`<line x1="34" y1="60" x2="30" y2="46" stroke="${k}" stroke-width="3" stroke-linecap="round"/><line x1="46" y1="58" x2="44" y2="44" stroke="${k}" stroke-width="3" stroke-linecap="round"/><circle cx="30" cy="44" r="3" fill="#fff"/><circle cx="44" cy="42" r="3" fill="#fff"/>`},
+ {ey:58,my:74,ty:18,hat:0,
+  body:f=>`<rect x="34" y="20" width="32" height="70" rx="16" fill="${f}"/><rect x="10" y="40" width="20" height="34" rx="10" fill="${f}"/><rect x="70" y="30" width="20" height="40" rx="10" fill="${f}"/>`,
+  front:(f,a)=>`<circle cx="50" cy="18" r="6" fill="${a}"/>`},
+ {ey:52,my:70,ty:16,hat:0,
+  back:(f)=>`<polygon points="30,20 36,2 44,22" fill="${f}"/><polygon points="70,20 64,2 56,22" fill="${f}"/>`,
+  body:f=>`<ellipse cx="50" cy="58" rx="34" ry="38" fill="${f}"/>`,
+  mid:()=>`<circle cx="38" cy="52" r="13" fill="#fff"/><circle cx="62" cy="52" r="13" fill="#fff"/>`,
+  front:(f,a,k,my)=>`<polygon points="46,64 54,64 50,74" fill="#f2a65a"/>`}
+];
+
+/* Everything about a character comes from the bubble id, so it is always the same one */
+function traits(id){
   const r = rng(hash(id)), pick = a=>a[Math.floor(r()*a.length)];
-  const bodies = ["#ff8fa3","#ffd166","#06d6a0","#4cc9f0","#b388ff","#ff9f68","#7bd88f","#f78fb3","#5eead4","#fca5a5"];
-  const accents = ["#ef476f","#118ab2","#ffb703","#8338ec","#2ec4b6","#fb5607"];
-  const body = pick(bodies);
-  const acc = pick(accents);
-  const ink = "#1b2a49";
-  const shape = pick(["circle","square","tall","drop"]);
-  const eyes = pick(["dots","big","cyclops","happy"]);
-  const mouth = pick(["smile","open","o","cat"]);
-  const hat = pick(["none","antenna","ears","horns","sprout","crown","round"]);
-  const cheeks = r() > .5;
-  const P = {circle:{ty:20,fy:0},square:{ty:27,fy:0},tall:{ty:18,fy:2},drop:{ty:14,fy:12}}[shape];
-  const ty = P.ty, fy = P.fy;
-  const shapes = {
-    circle:'<circle cx="50" cy="58" r="38" fill="'+body+'"/>',
-    square:'<rect x="19" y="27" width="62" height="62" rx="22" fill="'+body+'"/>',
-    tall:'<ellipse cx="50" cy="58" rx="32" ry="40" fill="'+body+'"/>',
-    drop:'<path d="M50 14C78 40 84 58 72 76C62 90 38 90 28 76C16 58 22 40 50 14Z" fill="'+body+'"/>'
+  const roll = r();
+  const o = {
+    tier: roll<.03 ? 2 : roll<.18 ? 1 : 0,   // 0 common, 1 rare (sparkles), 2 golden
+    sp: Math.floor(r()*SPECIES.length),
+    body: pick(BODY), acc: pick(ACCENT),
+    pat: pick(["none","none","belly","spots","stripes","tone"]),
+    eyes: pick(EYES), brows: pick(["none","none","none","raised","angry","worried"]),
+    mouth: pick(MOUTHS), hat: pick(HATS),
+    cheeks: r()>.5, freckles: r()>.75, glasses: r()>.88, tie: r()>.88, wings: r()>.9
   };
-  const hats = {
-    none:"",
-    antenna:'<line x1="50" y1="'+(ty+4)+'" x2="50" y2="'+(ty-10)+'" stroke="'+ink+'" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="'+(ty-13)+'" r="6" fill="'+acc+'"/>',
-    ears:'<polygon points="26,'+(ty+14)+' 32,'+(ty-8)+' 46,'+(ty+4)+'" fill="'+acc+'"/><polygon points="74,'+(ty+14)+' 68,'+(ty-8)+' 54,'+(ty+4)+'" fill="'+acc+'"/>',
-    horns:'<polygon points="34,'+(ty+8)+' 30,'+(ty-10)+' 46,'+(ty+2)+'" fill="'+acc+'"/><polygon points="66,'+(ty+8)+' 70,'+(ty-10)+' 54,'+(ty+2)+'" fill="'+acc+'"/>',
-    sprout:'<line x1="50" y1="'+(ty+4)+'" x2="50" y2="'+(ty-8)+'" stroke="#2f9e5b" stroke-width="3" stroke-linecap="round"/><ellipse cx="41" cy="'+(ty-10)+'" rx="10" ry="5" fill="#4ade80" transform="rotate(-25 41 '+(ty-10)+')"/><ellipse cx="59" cy="'+(ty-10)+'" rx="10" ry="5" fill="#4ade80" transform="rotate(25 59 '+(ty-10)+')"/>',
-    round:'<circle cx="28" cy="'+(ty+8)+'" r="10" fill="'+acc+'"/><circle cx="72" cy="'+(ty+8)+'" r="10" fill="'+acc+'"/>',
-    crown:''
-  };
-  const crown = hat==="crown"
-    ? '<polygon points="36,'+(ty+6)+' 36,'+(ty-8)+' 43,'+(ty-1)+' 50,'+(ty-11)+' 57,'+(ty-1)+' 64,'+(ty-8)+' 64,'+(ty+6)+'" fill="#ffd23f" stroke="'+ink+'" stroke-width="2" stroke-linejoin="round"/>' : "";
-  const ey = 52+fy;
-  const eyeSets = {
-    dots:'<circle cx="39" cy="'+ey+'" r="4.5" fill="'+ink+'"/><circle cx="61" cy="'+ey+'" r="4.5" fill="'+ink+'"/>',
-    big:'<circle cx="38" cy="'+ey+'" r="9" fill="#fff"/><circle cx="62" cy="'+ey+'" r="9" fill="#fff"/><circle cx="40" cy="'+(ey+1)+'" r="4.5" fill="'+ink+'"/><circle cx="60" cy="'+(ey+1)+'" r="4.5" fill="'+ink+'"/>',
-    cyclops:'<circle cx="50" cy="'+ey+'" r="12" fill="#fff"/><circle cx="52" cy="'+(ey+1)+'" r="6" fill="'+ink+'"/>',
-    happy:'<path d="M32 '+(ey+3)+'Q39 '+(ey-7)+' 46 '+(ey+3)+'M54 '+(ey+3)+'Q61 '+(ey-7)+' 68 '+(ey+3)+'" stroke="'+ink+'" stroke-width="3.5" fill="none" stroke-linecap="round"/>'
-  };
-  const my = 68+fy;
-  const mouths = {
-    smile:'<path d="M40 '+my+'Q50 '+(my+10)+' 60 '+my+'" stroke="'+ink+'" stroke-width="3.5" fill="none" stroke-linecap="round"/>',
-    open:'<path d="M40 '+my+'Q50 '+(my+16)+' 60 '+my+'Z" fill="'+ink+'"/>',
-    o:'<ellipse cx="50" cy="'+(my+3)+'" rx="4.5" ry="5.5" fill="'+ink+'"/>',
-    cat:'<path d="M38 '+(my+2)+'Q44 '+(my+9)+' 50 '+(my+2)+'Q56 '+(my+9)+' 62 '+(my+2)+'" stroke="'+ink+'" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
-  };
-  const cheek = cheeks
-    ? '<circle cx="30" cy="'+(ey+11)+'" r="5" fill="#ff5d8f" opacity=".45"/><circle cx="70" cy="'+(ey+11)+'" r="5" fill="#ff5d8f" opacity=".45"/>' : "";
-  return '<svg viewBox="0 -8 100 108" width="'+px+'" height="'+px+'" aria-hidden="true">'
-    + hats[hat] + shapes[shape] + cheek + eyeSets[eyes] + mouths[mouth] + crown + '</svg>';
+  o.spots = [0,1,2,3].map(()=>[25+r()*50, 35+r()*45, 3+r()*4]);
+  return o;
+}
+
+function eyesSvg(type,ey,k){
+  const st = `stroke="${k}" stroke-width="3.5" fill="none" stroke-linecap="round"`;
+  switch(type){
+    case "big": return `<circle cx="38" cy="${ey}" r="9" fill="#fff"/><circle cx="62" cy="${ey}" r="9" fill="#fff"/><circle cx="40" cy="${ey+1}" r="4.5" fill="${k}"/><circle cx="60" cy="${ey+1}" r="4.5" fill="${k}"/>`;
+    case "cyclops": return `<circle cx="50" cy="${ey}" r="12" fill="#fff"/><circle cx="52" cy="${ey+1}" r="6" fill="${k}"/>`;
+    case "happy": return `<path d="M32 ${ey+3}Q39 ${ey-7} 46 ${ey+3}M54 ${ey+3}Q61 ${ey-7} 68 ${ey+3}" ${st}/>`;
+    case "sleepy": return `<path d="M32 ${ey}Q39 ${ey+8} 46 ${ey}M54 ${ey}Q61 ${ey+8} 68 ${ey}" ${st}/>`;
+    case "wink": return `<circle cx="39" cy="${ey}" r="4.5" fill="${k}"/><path d="M54 ${ey+3}Q61 ${ey-7} 68 ${ey+3}" ${st}/>`;
+    case "sparkle": return sparkle(39,ey,7.5,k)+sparkle(61,ey,7.5,k);
+    case "shiny": return `<circle cx="38" cy="${ey}" r="9" fill="#fff"/><circle cx="62" cy="${ey}" r="9" fill="#fff"/><circle cx="38" cy="${ey+1}" r="5.5" fill="${k}"/><circle cx="62" cy="${ey+1}" r="5.5" fill="${k}"/><circle cx="36" cy="${ey-1}" r="2" fill="#fff"/><circle cx="60" cy="${ey-1}" r="2" fill="#fff"/>`;
+    case "oval": return `<ellipse cx="36" cy="${ey}" rx="8" ry="12" fill="${k}" transform="rotate(-18 36 ${ey})"/><ellipse cx="64" cy="${ey}" rx="8" ry="12" fill="${k}" transform="rotate(18 64 ${ey})"/><circle cx="33" cy="${ey-4}" r="2.5" fill="#fff"/><circle cx="61" cy="${ey-4}" r="2.5" fill="#fff"/>`;
+    case "star": return `<circle cx="38" cy="${ey}" r="8" fill="#fff"/><circle cx="62" cy="${ey}" r="8" fill="#fff"/>`+sparkle(38,ey,4.5,k)+sparkle(62,ey,4.5,k);
+    case "hearts": return `<path d="M38 ${ey-3}C35 ${ey-8} 28 ${ey-6} 28 ${ey-1}C28 ${ey+3} 38 ${ey+8} 38 ${ey+8}C38 ${ey+8} 48 ${ey+3} 48 ${ey-1}C48 ${ey-6} 41 ${ey-8} 38 ${ey-3}Z" fill="${k}"/><path d="M62 ${ey-3}C59 ${ey-8} 52 ${ey-6} 52 ${ey-1}C52 ${ey+3} 62 ${ey+8} 62 ${ey+8}C62 ${ey+8} 72 ${ey+3} 72 ${ey-1}C72 ${ey-6} 65 ${ey-8} 62 ${ey-3}Z" fill="${k}"/>`;
+    default: return `<circle cx="39" cy="${ey}" r="4.5" fill="${k}"/><circle cx="61" cy="${ey}" r="4.5" fill="${k}"/>`;
+  }
+}
+function mouthSvg(type,my,k){
+  const line = `<path d="M40 ${my}Q50 ${my+10} 60 ${my}" stroke="${k}" stroke-width="3.5" fill="none" stroke-linecap="round"/>`;
+  switch(type){
+    case "open": return `<path d="M40 ${my}Q50 ${my+16} 60 ${my}Z" fill="${k}"/>`;
+    case "o": return `<ellipse cx="50" cy="${my+3}" rx="4.5" ry="5.5" fill="${k}"/>`;
+    case "cat": return `<path d="M38 ${my+2}Q44 ${my+9} 50 ${my+2}Q56 ${my+9} 62 ${my+2}" stroke="${k}" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+    case "tongue": return `<ellipse cx="50" cy="${my+8}" rx="4.5" ry="5" fill="#ff6b8b"/>`+line;
+    case "fang": return line+`<path d="M55 ${my+3.5}L59.5 ${my+2}L57.5 ${my+10}Z" fill="#fff" stroke="${k}" stroke-width="1.2" stroke-linejoin="round"/>`;
+    case "flat": return `<path d="M42 ${my+3}L58 ${my+3}" stroke="${k}" stroke-width="3.5" stroke-linecap="round"/>`;
+    case "grin": return `<path d="M38 ${my}Q50 ${my+13} 62 ${my}Z" fill="${k}"/><path d="M42 ${my+2}L44 ${my+7}L46 ${my+2}M50 ${my+2.5}L52 ${my+8}L54 ${my+2.5}M58 ${my+2}L56 ${my+7}L54 ${my+2}" fill="#fff"/>`;
+    default: return line;
+  }
+}
+function hatBack(hat,ty,a){
+  switch(hat){
+    case "antenna": return `<line x1="50" y1="${ty+4}" x2="50" y2="${ty-10}" stroke="${INK}" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="${ty-13}" r="6" fill="${a}"/>`;
+    case "ears": return `<polygon points="26,${ty+14} 32,${ty-8} 46,${ty+4}" fill="${a}"/><polygon points="74,${ty+14} 68,${ty-8} 54,${ty+4}" fill="${a}"/>`;
+    case "horns": return `<polygon points="34,${ty+8} 30,${ty-10} 46,${ty+2}" fill="${a}"/><polygon points="66,${ty+8} 70,${ty-10} 54,${ty+2}" fill="${a}"/>`;
+    case "sprout": return `<line x1="50" y1="${ty+4}" x2="50" y2="${ty-8}" stroke="#2f9e5b" stroke-width="3" stroke-linecap="round"/><ellipse cx="41" cy="${ty-10}" rx="10" ry="5" fill="#4ade80" transform="rotate(-25 41 ${ty-10})"/><ellipse cx="59" cy="${ty-10}" rx="10" ry="5" fill="#4ade80" transform="rotate(25 59 ${ty-10})"/>`;
+    case "round": return `<circle cx="28" cy="${ty+8}" r="10" fill="${a}"/><circle cx="72" cy="${ty+8}" r="10" fill="${a}"/>`;
+    case "mask": return `<rect x="28" y="${ty+10}" width="44" height="10" rx="5" fill="${a}"/>`;
+    default: return "";
+  }
+}
+function hatFront(hat,ty,a){
+  switch(hat){
+    case "crown": return `<polygon points="36,${ty+6} 36,${ty-8} 43,${ty-1} 50,${ty-11} 57,${ty-1} 64,${ty-8} 64,${ty+6}" fill="#ffd23f" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>`;
+    case "halo": return `<ellipse cx="50" cy="${ty-8}" rx="18" ry="5" fill="none" stroke="#ffd23f" stroke-width="4"/>`;
+    case "party": return `<polygon points="40,${ty+5} 60,${ty+5} 50,${ty-20}" fill="${a}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/><circle cx="48" cy="${ty-4}" r="2" fill="#fff"/><circle cx="53" cy="${ty-11}" r="1.8" fill="#fff"/><circle cx="50" cy="${ty-22}" r="4" fill="#ffd23f"/>`;
+    case "ribbon": return `<polygon points="66,${ty+5} 52,${ty-4} 52,${ty+12}" fill="#ff5d8f"/><polygon points="66,${ty+5} 80,${ty-4} 80,${ty+12}" fill="#ff5d8f"/><circle cx="66" cy="${ty+5}" r="4.5" fill="#ffb3c9"/>`;
+    case "beanie": return `<path d="M30 ${ty+10}Q50 ${ty-16} 70 ${ty+10}Z" fill="${a}"/><rect x="28" y="${ty+6}" width="44" height="9" rx="4.5" fill="#fff" opacity=".85"/><circle cx="50" cy="${ty-8}" r="5" fill="#fff"/>`;
+    case "flower": return `<circle cx="42" cy="${ty-8}" r="4" fill="#fff"/><circle cx="34" cy="${ty-4}" r="4" fill="#fff"/><circle cx="34" cy="${ty-12}" r="4" fill="#fff"/><circle cx="50" cy="${ty-12}" r="4" fill="#fff"/><circle cx="42" cy="${ty-8}" r="3" fill="#ffd23f"/>`;
+    default: return "";
+  }
+}
+
+function critter(id, px){
+  const T_ = traits(id), S = SPECIES[T_.sp], h = hash(id).toString(36);
+  const gold = T_.tier===2, a = T_.acc;
+  const fill = gold ? `url(#g${h})` : T_.body;
+  const k = S.ink || INK, ey = S.ey, my = S.my, ty = S.ty;
+  const hat = S.hat ? T_.hat : "none";
+  let o = `<defs><clipPath id="c${h}">${S.body("#000")}</clipPath>`;
+  if(gold) o += `<linearGradient id="g${h}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff1a8"/><stop offset=".55" stop-color="#ffcc33"/><stop offset="1" stop-color="#e59a00"/></linearGradient><radialGradient id="l${h}"><stop offset="0" stop-color="#ffe27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffe27a" stop-opacity="0"/></radialGradient>`;
+  o += `</defs>`;
+  if(gold) o += `<circle cx="50" cy="54" r="58" fill="url(#l${h})"/>`;
+  o += `<ellipse cx="50" cy="97" rx="26" ry="4" fill="#000" opacity=".18"/>`;
+  if(T_.wings) o += `<ellipse cx="9" cy="56" rx="9" ry="16" fill="#fff" opacity=".9" transform="rotate(-25 9 56)"/><ellipse cx="91" cy="56" rx="9" ry="16" fill="#fff" opacity=".9" transform="rotate(25 91 56)"/>`;
+  o += hatBack(hat,ty,a);
+  if(S.back) o += S.back(fill,a);
+  o += S.body(fill);
+  if(!S.nopat){
+    let p = `<ellipse cx="36" cy="${ty+16}" rx="9" ry="5" fill="#fff" opacity=".35" transform="rotate(-35 36 ${ty+16})"/>`;
+    if(T_.pat==="belly") p += `<ellipse cx="50" cy="${my+16}" rx="22" ry="14" fill="#fff" opacity=".3"/>`;
+    if(T_.pat==="spots") p += T_.spots.map(s=>`<circle cx="${s[0].toFixed(1)}" cy="${s[1].toFixed(1)}" r="${s[2].toFixed(1)}" fill="#000" opacity=".13"/>`).join("");
+    if(T_.pat==="stripes") p += `<path d="M-5 ${ty+16}Q50 ${ty+6} 105 ${ty+16}M-5 ${ty+30}Q50 ${ty+20} 105 ${ty+30}M-5 ${ty+44}Q50 ${ty+34} 105 ${ty+44}" stroke="#000" stroke-opacity=".11" stroke-width="6" fill="none"/>`;
+    if(T_.pat==="tone") p += `<rect x="0" y="${my+8}" width="100" height="60" fill="#fff" opacity=".22"/>`;
+    o += `<g clip-path="url(#c${h})">${p}</g>`;
+  }
+  if(S.mid) o += S.mid(fill,a,k);
+  if(!S.plain){
+    if(T_.cheeks) o += `<circle cx="30" cy="${ey+11}" r="5" fill="#ff5d8f" opacity=".45"/><circle cx="70" cy="${ey+11}" r="5" fill="#ff5d8f" opacity=".45"/>`;
+    if(T_.freckles) o += [[27,9],[32,12],[30,5],[73,9],[68,12],[70,5]].map(f=>`<circle cx="${f[0]}" cy="${ey+f[1]}" r="1.6" fill="#a0522d" opacity=".6"/>`).join("");
+  }
+  const eyes = S.eyes || T_.eyes;
+  o += eyesSvg(eyes,ey,k);
+  if(T_.brows!=="none" && eyes!=="cyclops" && eyes!=="oval"){
+    const d = {raised:`M31 ${ey-14}Q38 ${ey-19} 45 ${ey-14}M55 ${ey-14}Q62 ${ey-19} 69 ${ey-14}`,
+               angry:`M31 ${ey-17}L45 ${ey-11}M69 ${ey-17}L55 ${ey-11}`,
+               worried:`M31 ${ey-11}L45 ${ey-16}M69 ${ey-11}L55 ${ey-16}`}[T_.brows];
+    o += `<path d="${d}" stroke="${k}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  }
+  if(T_.glasses && !S.plain && eyes!=="cyclops" && eyes!=="oval")
+    o += `<circle cx="38" cy="${ey}" r="11.5" fill="none" stroke="${k}" stroke-width="2.6"/><circle cx="62" cy="${ey}" r="11.5" fill="none" stroke="${k}" stroke-width="2.6"/><path d="M49.5 ${ey}L50.5 ${ey}" stroke="${k}" stroke-width="2.6"/>`;
+  o += mouthSvg(T_.mouth,my,k);
+  if(S.front) o += S.front(fill,a,k);
+  if(T_.tie){ const y = Math.min(my+14,86);
+    o += `<polygon points="50,${y} 37,${y-7} 37,${y+7}" fill="${a}"/><polygon points="50,${y} 63,${y-7} 63,${y+7}" fill="${a}"/><circle cx="50" cy="${y}" r="3.5" fill="${INK}"/>`; }
+  o += hatFront(hat,ty,a);
+  if(T_.tier>0) o += sparkle(9,10,6,"#ffe680")+sparkle(91,16,5,"#ffe680")+sparkle(89,84,6.5,"#ffe680")+sparkle(10,78,4.5,"#ffe680");
+  return `<svg viewBox="0 -8 100 108" width="${px}" height="${px}" style="overflow:visible" aria-hidden="true">${o}</svg>`;
 }
 
 /* ---------- private-info check (runs before publishing) ---------- */
 const CHECKS = [
-  [/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i, "email addresses"],
-  [/(^|\s)@\w/, "usernames (@something)"],
-  [/(\d[\s().+-]*){7,}/, "phone numbers or long numbers"],
-  [/(https?:\/\/|www\.)|\b[a-z0-9-]+\.(com|net|org|io|cl|me|co)\b/i, "links"],
-  [/\b(instagram|insta|ig|snapchat|snap|tiktok|telegram|whatsapp|discord|twitter|facebook)\b\s*[:\-]?\s*\S/i, "social media accounts"],
-  [/\b(my name is|i am called|i'm called|call me|me llamo|mi nombre es|soy)\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+/, "names"]
+  [/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i, "email"],
+  [/(^|\s)@\w/, "handle"],
+  [/(\d[\s().+-]*){7,}/, "phone"],
+  [/(https?:\/\/|www\.)|\b[a-z0-9-]+\.(com|net|org|io|cl|me|co)\b/i, "link"],
+  [/\b(instagram|insta|ig|snapchat|snap|tiktok|telegram|whatsapp|discord|twitter|facebook)\b\s*[:\-]?\s*\S/i, "social"],
+  [/\b(my name is|i am called|i'm called|call me|me llamo|mi nombre es|soy)\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+/, "name"]
 ];
 const findPrivate = t => CHECKS.filter(([re]) => re.test(t)).map(c => c[1]);
 
 /* ---------- bubble rendering ---------- */
 function addBubble(row,fresh){
-  if(seen.has(row.id)) return;
+  if(seen.has(row.id)) return els.get(row.id);
   seen.add(row.id);
   $("empty").style.display="none";
   const h = hash(row.id);
@@ -363,15 +837,19 @@ function addBubble(row,fresh){
   const s = document.createElement("span");
   s.textContent = row.body; // textContent: never render user text as HTML
   b.appendChild(s);
-  b.addEventListener("click",()=>openRead(row));
-  space.appendChild(b);
-  while(space.children.length > MAX_BUBBLES) space.removeChild(space.firstChild);
+  b.dataset.id = row.id;
+  b.addEventListener("click",e=>{ if(moved && e.detail!==0) return; openRead(row); });
+  world.appendChild(b);
+  els.set(row.id, b);
+  while(world.children.length > MAX_BUBBLES){ els.delete(world.firstChild.dataset.id); world.removeChild(world.firstChild); }
+  sizeWorld();
+  return b;
 }
 
 function openRead(row){
-  $("readNum").textContent = row.num!=null ? "Bubble #"+row.num : "Bubble";
+  $("readNum").textContent = row.num!=null ? t("bubble")+" #"+row.num : t("bubble");
   $("reader").textContent = row.body;
-  $("when").textContent = new Date(row.created_at).toLocaleString();
+  $("when").textContent = new Date(row.created_at).toLocaleString(lang);
   $("readDlg").showModal();
 }
 
@@ -379,49 +857,157 @@ function openRead(row){
 async function load(){
   const {data,error} = await sb.from("bubbles").select("*")
     .order("created_at",{ascending:false}).limit(MAX_BUBBLES);
-  if(error){ $("status").textContent = "Couldn't load bubbles. Check your Supabase URL and key."; return; }
+  if(error){ $("status").textContent = t("loadErr"); return; }
   if(!data.length) $("empty").style.display="flex";
   data.reverse().forEach(r=>addBubble(r,false));
+  sizeWorld(); centerView();
+  if(data.length){
+    const hint = t("hint");
+    $("status").textContent = hint;
+    setTimeout(()=>{ if($("status").textContent===hint) $("status").textContent=""; }, 7000);
+  }
 }
 sb.channel("bubbles-live")
   .on("postgres_changes",{event:"INSERT",schema:"public",table:"bubbles"},p=>addBubble(p.new,true))
   .subscribe();
+applyLang();
 refreshButtons();
+sizeWorld(); centerView();
 load();
+let introSeen = false;
+try{ introSeen = localStorage.getItem("oc_intro")==="1"; }catch(e){}
+if(!introSeen) openOb();
 
 /* ---------- information + stats ---------- */
 async function loadStats(){
   try{
-    const since = new Date(Date.now()-864e5).toISOString();
-    const [all,day,first] = await Promise.all([
-      sb.from("bubbles").select("*",{count:"exact",head:true}),
-      sb.from("bubbles").select("*",{count:"exact",head:true}).gte("created_at",since),
-      sb.from("bubbles").select("created_at").order("created_at",{ascending:true}).limit(1)
-    ]);
-    $("sTotal").textContent = all.count ?? "–";
-    $("sDay").textContent = day.count ?? "–";
-    const f = first.data && first.data[0];
-    $("sFirst").textContent = f ? new Date(f.created_at).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"}) : "–";
+    const r = await sb.from("bubbles").select("*",{count:"exact",head:true});
+    $("sTotal").textContent = r.count ?? "–";
   }catch(e){}
 }
-$("openInfo").onclick = ()=>{ $("infoDlg").showModal(); loadStats(); };
+$("openInfo").onclick = ()=>$("infoDlg").showModal();
+$("openStats").onclick = ()=>{ $("statsDlg").showModal(); loadStats(); };
+$("closeStats").onclick = ()=>$("statsDlg").close();
 $("closeInfo").onclick = ()=>$("infoDlg").close();
 $("closeRead").onclick = ()=>$("readDlg").close();
 $("closeMine").onclick = ()=>$("mineDlg").close();
 
 /* ---------- my character ---------- */
+function fmtDuration(ms){
+  const s = Math.max(1, Math.round((ms||0)/1000));
+  if(s<60) return lang==="es" ? `${s} segundo${s===1?"":"s"}` : `${s} second${s===1?"":"s"}`;
+  const m = Math.max(1, Math.round(s/60));
+  return lang==="es" ? `${m} minuto${m===1?"":"s"}` : `${m} minute${m===1?"":"s"}`;
+}
+function confettiBurst(host){
+  host.querySelectorAll(".confetti-piece").forEach(n=>n.remove());
+  const n = 14;
+  for(let i=0;i<n;i++){
+    const s = document.createElement("span");
+    s.className = "confetti-piece";
+    s.style.setProperty("--ang", (360/n*i + (Math.random()*20-10))+"deg");
+    s.style.background = [...BODY,...ACCENT][Math.floor(Math.random()*(BODY.length+ACCENT.length))];
+    s.style.animationDelay = (Math.random()*.15)+"s";
+    host.appendChild(s);
+    setTimeout(()=>s.remove(), 1100);
+  }
+}
 function showMine(isNew){
-  $("mineTitle").textContent = isNew ? "You earned a character!" : "Your character";
+  const tr = traits(mine.id);
+  const name = t("nm"+tr.sp), species = t("sp"+tr.sp);
+  const desc = t("ds"+tr.sp, {time: fmtDuration(mine.elapsedMs), len: mine.len ?? mine.body.length});
+  $("mineTitle").textContent = isNew ? t("earned") : t("yours");
   $("mineHero").className = "hero" + (isNew ? " new" : "");
   $("mineHero").innerHTML = critter(mine.id, 150);
-  $("mineText").textContent = isNew
-    ? "It's yours to keep on this device. Nobody else can tell which bubble is yours."
-    : "You've used your one bubble on this device. Look for the white ring around it in the universe.";
+  $("mineName").textContent = name;
+  $("mineDesc").textContent = desc;
+  $("mineText").textContent = isNew ? t("earnedText") : t("usedText");
   $("minePreview").textContent = mine.body;
-  $("mineNum").textContent = mine.num!=null ? "Bubble #"+mine.num : "";
-  $("mineDlg").showModal();
+  const tb = document.createElement("b"), tg = document.createElement("span");
+  tb.textContent = species+" · "; tg.className = "tag tier"+tr.tier; tg.textContent = t("tier"+tr.tier);
+  $("mineTier").replaceChildren(tb, tg);
+  $("mineNum").textContent = mine.num!=null ? t("bubble")+" #"+mine.num : "";
+  const reveal = ["mineName","mineTier","mineDesc","minePreview","shareMine"].map($);
+  if(isNew){
+    $("revealHint").hidden = false;
+    $("mineHero").querySelector("svg").style.filter = "blur(10px) grayscale(1)";
+    reveal.forEach(e=>e.style.opacity = 0);
+    $("mineDlg").showModal();
+    setTimeout(()=>{
+      $("revealHint").hidden = true;
+      const svg = $("mineHero").querySelector("svg");
+      if(svg) svg.style.filter = "";
+      reveal.forEach(e=>e.style.opacity = 1);
+      confettiBurst($("mineHero"));
+    }, 900);
+  }else{
+    $("revealHint").hidden = true;
+    reveal.forEach(e=>e.style.opacity = 1);
+    $("mineDlg").showModal();
+  }
 }
 $("openMine").onclick = ()=>showMine(false);
+$("findMine").onclick = ()=>{ $("mineDlg").close(); centerOn(els.get(mine.id)); };
+
+/* ---------- share character ---------- */
+function wrapText(ctx,text,x,y,maxWidth,lineHeight){
+  const words = text.split(" "); let line = "", yy = y;
+  for(const w of words){
+    const test = line+w+" ";
+    if(ctx.measureText(test).width>maxWidth && line){ ctx.fillText(line,x,yy); line=w+" "; yy+=lineHeight; }
+    else line = test;
+  }
+  ctx.fillText(line,x,yy);
+  return yy;
+}
+function renderCharacterPng(id,name,desc){
+  return new Promise((resolve,reject)=>{
+    const svgUrl = "data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(critter(id,420))));
+    const img = new Image();
+    img.onload = ()=>{
+      const W=600,H=740;
+      const c = document.createElement("canvas"); c.width=W; c.height=H;
+      const ctx = c.getContext("2d");
+      const g = ctx.createRadialGradient(W*.32,H*.24,20,W*.32,H*.24,W*.9);
+      g.addColorStop(0,"#1b2a49"); g.addColorStop(1,"#0d1b2a");
+      ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+      ctx.drawImage(img,(W-420)/2,50,420,420);
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#eef2f7"; ctx.font = "700 42px system-ui,sans-serif";
+      ctx.fillText(name, W/2, 500);
+      ctx.fillStyle = "#9fb0c8"; ctx.font = "400 16px system-ui,sans-serif";
+      const yy = wrapText(ctx, desc, W/2, 540, 480, 24);
+      ctx.fillStyle = "#8fd3c8"; ctx.font = "600 16px system-ui,sans-serif";
+      ctx.fillText(t("shareCta")+" "+(location.host||location.href), W/2, Math.max(yy+50, H-40));
+      c.toBlob(b=> b ? resolve(b) : reject(new Error("no blob")), "image/png");
+    };
+    img.onerror = reject;
+    img.src = svgUrl;
+  });
+}
+async function shareCharacter(){
+  const tr = traits(mine.id);
+  const name = t("nm"+tr.sp), species = t("sp"+tr.sp);
+  const desc = t("ds"+tr.sp, {time: fmtDuration(mine.elapsedMs), len: mine.len ?? mine.body.length});
+  const url = location.origin + location.pathname;
+  const text = `${name} — ${species}\n${desc}\n\n${t("shareCta")} ${url}`;
+  try{
+    const blob = await renderCharacterPng(mine.id, name, desc);
+    const file = new File([blob], name.toLowerCase()+".png", {type:"image/png"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:name, text}); return;
+    }
+    if(navigator.share){ await navigator.share({title:name, text, url}); return; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = file.name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    try{ await navigator.clipboard.writeText(url); $("status").textContent = t("linkCopied"); setTimeout(()=>{ if($("status").textContent===t("linkCopied")) $("status").textContent=""; },4000); }catch(e){}
+  }catch(e){
+    try{ await navigator.clipboard.writeText(text); $("status").textContent = t("linkCopied"); setTimeout(()=>{ if($("status").textContent===t("linkCopied")) $("status").textContent=""; },4000); }
+    catch(_){ $("status").textContent = t("shareFail"); }
+  }
+}
+$("shareMine").onclick = shareCharacter;
 
 /* ---------- writing (one bubble per device) ---------- */
 const ta = $("text");
@@ -435,14 +1021,16 @@ async function showNext(){
     const {data,error} = await sb.from("bubbles").select("num").order("num",{ascending:false}).limit(1);
     if(error) return;
     const n = ((data[0] && data[0].num) || 0) + 1;
-    ["nextNum","nextNum2"].forEach(i=>{ $(i).textContent = "You're writing bubble #"+n; $(i).hidden=false; });
+    ["nextNum","nextNum2"].forEach(i=>{ $(i).textContent = t("next",{n}); $(i).hidden=false; });
   }catch(e){}
 }
+let writeStartTs = null;
 $("openWrite").onclick = ()=>{
   if(mine){ showMine(false); return; }
   showNext();
   $("err").textContent = ""; $("err2").textContent = "";
   showStep("write");
+  writeStartTs = Date.now();
   $("writeDlg").showModal(); ta.focus();
 };
 $("cancel").onclick = ()=>$("writeDlg").close();
@@ -450,10 +1038,10 @@ ta.oninput = ()=>{ $("count").textContent = ta.value.length+" / 1000"; $("err").
 
 $("review").onclick = ()=>{
   const text = ta.value.trim();
-  if(!text){ $("err").textContent="Write something first."; return; }
+  if(!text){ $("err").textContent=t("writeFirst"); return; }
   const hits = findPrivate(text);
   if(hits.length){
-    $("err").textContent = "Please remove "+hits.join(", ")+". This space is for anonymous thoughts only.";
+    $("err").textContent = t("remove",{list:hits.map(k=>t("chk_"+k)).join(", ")});
     return;
   }
   $("preview").textContent = text;
@@ -469,13 +1057,12 @@ $("publish").onclick = async ()=>{
   const {data,error} = await sb.from("bubbles").insert({body:text}).select().single();
   $("publish").disabled = false;
   if(error){
-    $("err2").textContent = /check constraint/i.test(error.message)
-      ? "That looks like it contains private information. Go back and rephrase. Your chance isn't used yet."
-      : "Couldn't publish. Your chance isn't used yet, so try again in a moment.";
+    $("err2").textContent = /check constraint/i.test(error.message) ? t("pubPrivate") : t("pubFail");
     return;
   }
-  saveMine(data);
-  addBubble(data,true);
+  saveMine(data, {elapsedMs: Date.now() - (writeStartTs||Date.now()), len: text.length});
+  const el = addBubble(data,true);
+  centerOn(el);
   ta.value=""; $("count").textContent="0 / 1000";
   $("writeDlg").close();
   showMine(true);
