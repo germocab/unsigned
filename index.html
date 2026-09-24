@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Unsigned</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --sky1:#0d1b2a; --sky2:#1b2a49; --ink:#eef2f7; --dim:#9fb0c8;
+  --b1:#8fd3c8; --b2:#f2c6a0; --b3:#b7a8f0; --b4:#f0a9b8; --b5:#a9d2f5;
+  --panel:#122036; --line:#2b3d5c;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  color:var(--ink);
+  background:radial-gradient(ellipse at 30% 20%,var(--sky2),var(--sky1) 70%) fixed;
+  overflow:hidden;-webkit-text-size-adjust:100%;
+}
+#space{position:fixed;inset:0;overflow:hidden}
+.bubble{
+  position:absolute;border-radius:50%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  padding:11%;text-align:center;cursor:pointer;
+  color:#0d1b2a;line-height:1.3;border:0;font-family:inherit;
+  background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.75),var(--c) 55%);
+  box-shadow:0 0 30px -6px var(--c);
+  animation:drift var(--d) ease-in-out infinite alternate;
+  transition:transform .2s;-webkit-tap-highlight-color:transparent;
+}
+.bubble:hover,.bubble:focus-visible{transform:scale(1.08);z-index:5;outline:2px solid #fff}
+.bubble.mine{z-index:2;box-shadow:0 0 0 3px rgba(255,255,255,.95),0 0 44px 6px var(--c)}
+.bubble svg{flex:none;overflow:visible}
+.bubble span{overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--lines);overflow-wrap:anywhere}
+@keyframes drift{from{translate:0 0}to{translate:var(--dx) var(--dy)}}
+.bubble.fresh{animation:drift var(--d) ease-in-out infinite alternate,pop .8s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{scale:0}to{scale:1}}
+
+header{
+  position:fixed;top:0;left:0;right:0;z-index:10;
+  padding:calc(16px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) 12px calc(20px + env(safe-area-inset-left));
+  display:flex;justify-content:space-between;align-items:flex-start;gap:16px;pointer-events:none;
+}
+header>*{pointer-events:auto}
+h1{margin:0;font-size:22px;font-weight:600;letter-spacing:.01em}
+h1 small{font-size:12px;font-weight:400;color:var(--dim);margin-left:6px}
+header p{margin:4px 0 0;color:var(--dim);font-size:14px;max-width:36ch;line-height:1.4}
+.actions{display:flex;gap:10px;align-items:center}
+.actions button{
+  font:inherit;font-size:15px;border-radius:999px;padding:11px 20px;cursor:pointer;
+  border:1px solid var(--line);background:rgba(18,32,54,.7);color:var(--ink);
+  backdrop-filter:blur(6px);display:inline-flex;align-items:center;justify-content:center;gap:8px;
+}
+.actions button.write{background:var(--b2);color:#0d1b2a;border-color:var(--b2);font-weight:600}
+.actions button.write:hover{background:#f7d6b8}
+.actions button:not(.write):hover{background:#1b2d4a}
+.actions button.mineBtn{padding:6px 18px 6px 8px}
+button:focus-visible,textarea:focus-visible{outline:2px solid #fff;outline-offset:2px}
+[hidden]{display:none!important}
+
+dialog{
+  border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);
+  width:min(540px,calc(100vw - 24px));max-height:calc(100dvh - 24px);
+  padding:24px;font-family:inherit;overflow:auto;
+}
+dialog::backdrop{background:rgba(5,10,20,.7)}
+dialog h2{margin:0 0 8px;font-size:20px;font-weight:600}
+dialog h3{margin:20px 0 6px;font-size:15px;font-weight:600}
+dialog p,dialog li{color:var(--dim);font-size:14px;line-height:1.55}
+dialog p{margin:0 0 12px}
+dialog ul{margin:0 0 12px;padding-left:20px}
+dialog li{margin-bottom:4px}
+.warn{
+  border:1px solid var(--b2);background:rgba(242,198,160,.1);border-radius:12px;
+  padding:12px 14px;margin:0 0 14px;font-size:14px;line-height:1.5;color:var(--ink)
+}
+.warn b{color:var(--b2)}
+textarea{
+  width:100%;height:150px;resize:vertical;border-radius:12px;border:1px solid var(--line);
+  background:#0b1626;color:var(--ink);font:inherit;font-size:16px;padding:12px;line-height:1.5;
+}
+.row{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:12px}
+.count{color:var(--dim);font-size:13px}
+.err{color:#f4a3a3;font-size:14px;min-height:20px;margin-top:10px;line-height:1.4}
+.btns{display:flex;gap:8px}
+.btns button{font:inherit;font-size:15px;border-radius:999px;padding:10px 18px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink)}
+.btns button.go{background:var(--b1);color:#0d1b2a;border-color:var(--b1);font-weight:600}
+.btns button:disabled{opacity:.5;cursor:default}
+.preview{
+  white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)!important;font-size:16px!important;
+  border-left:3px solid var(--b3);padding:2px 0 2px 12px;margin:12px 0 14px!important;max-height:32dvh;overflow:auto
+}
+#reader{font-size:19px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 18px;color:var(--ink)}
+.when{color:var(--dim);font-size:13px}
+.readTop{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.readTop p{margin:0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 4px}
+.stat{border:1px solid var(--line);border-radius:14px;padding:12px 8px;text-align:center}
+.stat b{display:block;font-size:22px;font-weight:600;color:var(--ink)}
+.stat span{font-size:12px;color:var(--dim)}
+.close-row{display:flex;justify-content:flex-end;margin-top:18px}
+.hero{display:flex;justify-content:center;margin:6px 0 10px}
+.hero svg{width:150px;height:150px;overflow:visible;animation:bob 2.4s ease-in-out infinite}
+.hero.new svg{animation:hop .9s cubic-bezier(.2,1.5,.4,1),bob 2.4s ease-in-out .9s infinite}
+@keyframes bob{50%{transform:translateY(-6px)}}
+@keyframes hop{from{transform:scale(0) rotate(-20deg)}to{transform:scale(1) rotate(0)}}
+#mineDlg h2,#mineDlg .center{text-align:center}
+#empty{position:fixed;inset:0;display:none;align-items:center;justify-content:center;color:var(--dim);text-align:center;padding:24px;line-height:1.5}
+#status{position:fixed;bottom:74px;left:0;right:0;text-align:center;color:var(--dim);font-size:13px;z-index:10;pointer-events:none;padding:0 16px}
+
+@media (max-width:640px){
+  h1{font-size:19px}
+  header p{font-size:13px;max-width:none}
+  .actions{
+    position:fixed;left:0;right:0;bottom:0;z-index:10;
+    padding:12px calc(16px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+    background:linear-gradient(transparent,rgba(13,27,42,.92) 40%);
+  }
+  .actions button{flex:1;padding:14px 12px}
+  .actions button.mineBtn{padding:6px 12px}
+  dialog{padding:20px;border-radius:18px}
+  #reader{font-size:18px}
+  .stat b{font-size:19px}
+}
+@media (prefers-reduced-motion:reduce){
+  .bubble,.bubble.fresh,.hero svg,.hero.new svg{animation:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Unsigned<small>v1.2</small></h1>
+    <p>Anonymous thoughts, floating together. Nothing here has a name on it.</p>
+  </div>
+  <div class="actions">
+    <button id="openInfo" type="button">Information</button>
+    <button class="write" id="openWrite" type="button">Write your bubble</button>
+    <button class="mineBtn" id="openMine" type="button" hidden><span id="mineIcon"></span>My character</button>
+  </div>
+</header>
+
+<div id="space" aria-live="polite"></div>
+<div id="empty">It's quiet here.<br>Write the first bubble.</div>
+<div id="status"></div>
+
+<dialog id="writeDlg">
+  <div id="stepWrite">
+    <h2>Write your bubble</h2>
+    <div class="warn"><b>You only get one bubble per device.</b> Once you publish it, it can't be edited or deleted, and you can't write another. Think wisely about what you want to say, or you'll lose your chance.</div>
+    <p>Say anything you like. It's anonymous. Don't include names, phone numbers, emails, usernames or links.</p>
+    <textarea id="text" maxlength="500" placeholder="What's on your mind?"></textarea>
+    <div class="err" id="err" role="alert"></div>
+    <div class="row">
+      <span class="count" id="count">0 / 500</span>
+      <div class="btns">
+        <button id="cancel" type="button">Cancel</button>
+        <button id="review" class="go" type="button">Continue</button>
+      </div>
+    </div>
+  </div>
+  <div id="stepConfirm" hidden>
+    <h2>Publish this as your only bubble?</h2>
+    <p>This is your one chance on this device. After you publish, you can't change it or take it back.</p>
+    <p class="preview" id="preview"></p>
+    <div class="err" id="err2" role="alert"></div>
+    <div class="btns" style="justify-content:flex-end">
+      <button id="back" type="button">Go back and edit</button>
+      <button id="publish" class="go" type="button">Yes, publish it</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="mineDlg">
+  <h2 id="mineTitle"></h2>
+  <div class="hero" id="mineHero"></div>
+  <p class="center" id="mineText"></p>
+  <p class="preview" id="minePreview"></p>
+  <div class="close-row"><div class="btns"><button id="closeMine" class="go" type="button">Close</button></div></div>
+</dialog>
+
+<dialog id="readDlg">
+  <div class="readTop"><span id="readIcon"></span><p class="when" id="when"></p></div>
+  <p id="reader"></p>
+  <div class="btns"><button id="closeRead" type="button">Close</button></div>
+</dialog>
+
+<dialog id="infoDlg">
+  <h2>Information <span style="font-weight:400;font-size:13px;color:var(--dim)">version 1.2</span></h2>
+
+  <h3>What is this project?</h3>
+  <p>Unsigned is a social experiment: a shared universe of anonymous bubbles. Anyone with the link can write a short message and publish it. Everyone sees the same bubbles, and nobody knows who wrote which one.</p>
+
+  <h3>What is the goal?</h3>
+  <p>To see what people say when there's no name, no profile and no fear of being recognized. The aim is to read honest, unfiltered thoughts from a group of people, and to let everyone speak freely and safely.</p>
+
+  <h3>How it works</h3>
+  <ul>
+    <li>Each device can publish one bubble, so choose your words wisely.</li>
+    <li>When you publish, you earn a colorful character that lives inside your bubble. Every bubble has its own character, and no two are alike.</li>
+    <li>Only you can tell which one is yours: your bubble gets a white ring on your device, and you can see your character anytime with the "My character" button.</li>
+    <li>The limit is per browser. There are no accounts, so it can't be enforced perfectly. Clearing your browser data or using another device would allow another post, so please keep it fair.</li>
+  </ul>
+
+  <h3>Stats</h3>
+  <div class="stats">
+    <div class="stat"><b id="sTotal">–</b><span>bubbles in total</span></div>
+    <div class="stat"><b id="sDay">–</b><span>in the last 24 hours</span></div>
+    <div class="stat"><b id="sFirst">–</b><span>first bubble</span></div>
+  </div>
+
+  <h3>Privacy</h3>
+  <p>This website doesn't ask for or store your name, email, phone number or any account. It has no login. Only the text of each bubble and the time it was published are saved online. Your own browser keeps a small note on your device saying you've posted, plus a copy of your bubble, so the site can remember you and show your character. Like any website, the hosting and database services may keep basic technical logs that this project doesn't control.</p>
+
+  <h3>Please read before writing</h3>
+  <ul>
+    <li>Don't share private information: no phone numbers, email addresses, usernames, social media accounts, links, or real names of people.</li>
+    <li>Bubbles can't be edited or deleted once published, so think before you post.</li>
+    <li>Messages that contain private information are blocked automatically, but the filter isn't perfect. You are responsible for what you write.</li>
+    <li>Be kind. Don't use this space to harass or threaten anyone.</li>
+    <li>Everything here is written by anonymous people. The project doesn't verify or endorse any bubble.</li>
+  </ul>
+
+  <h3>Made with AI</h3>
+  <p>This website was designed and built with the help of an AI assistant (Claude, by Anthropic).</p>
+
+  <div class="close-row"><div class="btns"><button id="closeInfo" class="go" type="button">Close</button></div></div>
+</dialog>
+
+<script>
+/* ============ 1. PASTE YOUR SUPABASE VALUES HERE ============ */
+const SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
+/* ============================================================ */
+
+const MAX_BUBBLES = 200;
+const STORE_KEY = "unsigned_mine";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
+const space = $("space");
+const colors = ["--b1","--b2","--b3","--b4","--b5"];
+const seen = new Set();
+
+/* ---------- this device's one bubble ---------- */
+let mine = null;
+try{ mine = JSON.parse(localStorage.getItem(STORE_KEY)); }catch(e){}
+function saveMine(row){
+  mine = {id:row.id, body:row.body, created_at:row.created_at};
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(mine)); }catch(e){}
+  refreshButtons();
+}
+function refreshButtons(){
+  $("openWrite").hidden = !!mine;
+  $("openMine").hidden = !mine;
+  if(mine) $("mineIcon").innerHTML = critter(mine.id, 32);
+}
+
+/* ---------- character generator (same bubble id = same character) ---------- */
+function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+function rnd(seed,n){return ((Math.sin(seed+n)*10000)%1+1)%1}
+function rng(seed){return ()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+function critter(id, px){
+  const r = rng(hash(id)), pick = a=>a[Math.floor(r()*a.length)];
+  const bodies = ["#ff8fa3","#ffd166","#06d6a0","#4cc9f0","#b388ff","#ff9f68","#7bd88f","#f78fb3","#5eead4","#fca5a5"];
+  const accents = ["#ef476f","#118ab2","#ffb703","#8338ec","#2ec4b6","#fb5607"];
+  const body = pick(bodies);
+  const acc = pick(accents);
+  const ink = "#1b2a49";
+  const shape = pick(["circle","square","tall","drop"]);
+  const eyes = pick(["dots","big","cyclops","happy"]);
+  const mouth = pick(["smile","open","o","cat"]);
+  const hat = pick(["none","antenna","ears","horns","sprout","crown","round"]);
+  const cheeks = r() > .5;
+  const P = {circle:{ty:20,fy:0},square:{ty:27,fy:0},tall:{ty:18,fy:2},drop:{ty:14,fy:12}}[shape];
+  const ty = P.ty, fy = P.fy;
+  const shapes = {
+    circle:'<circle cx="50" cy="58" r="38" fill="'+body+'"/>',
+    square:'<rect x="19" y="27" width="62" height="62" rx="22" fill="'+body+'"/>',
+    tall:'<ellipse cx="50" cy="58" rx="32" ry="40" fill="'+body+'"/>',
+    drop:'<path d="M50 14C78 40 84 58 72 76C62 90 38 90 28 76C16 58 22 40 50 14Z" fill="'+body+'"/>'
+  };
+  const hats = {
+    none:"",
+    antenna:'<line x1="50" y1="'+(ty+4)+'" x2="50" y2="'+(ty-10)+'" stroke="'+ink+'" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="'+(ty-13)+'" r="6" fill="'+acc+'"/>',
+    ears:'<polygon points="26,'+(ty+14)+' 32,'+(ty-8)+' 46,'+(ty+4)+'" fill="'+acc+'"/><polygon points="74,'+(ty+14)+' 68,'+(ty-8)+' 54,'+(ty+4)+'" fill="'+acc+'"/>',
+    horns:'<polygon points="34,'+(ty+8)+' 30,'+(ty-10)+' 46,'+(ty+2)+'" fill="'+acc+'"/><polygon points="66,'+(ty+8)+' 70,'+(ty-10)+' 54,'+(ty+2)+'" fill="'+acc+'"/>',
+    sprout:'<line x1="50" y1="'+(ty+4)+'" x2="50" y2="'+(ty-8)+'" stroke="#2f9e5b" stroke-width="3" stroke-linecap="round"/><ellipse cx="41" cy="'+(ty-10)+'" rx="10" ry="5" fill="#4ade80" transform="rotate(-25 41 '+(ty-10)+')"/><ellipse cx="59" cy="'+(ty-10)+'" rx="10" ry="5" fill="#4ade80" transform="rotate(25 59 '+(ty-10)+')"/>',
+    round:'<circle cx="28" cy="'+(ty+8)+'" r="10" fill="'+acc+'"/><circle cx="72" cy="'+(ty+8)+'" r="10" fill="'+acc+'"/>',
+    crown:''
+  };
+  const crown = hat==="crown"
+    ? '<polygon points="36,'+(ty+6)+' 36,'+(ty-8)+' 43,'+(ty-1)+' 50,'+(ty-11)+' 57,'+(ty-1)+' 64,'+(ty-8)+' 64,'+(ty+6)+'" fill="#ffd23f" stroke="'+ink+'" stroke-width="2" stroke-linejoin="round"/>' : "";
+  const ey = 52+fy;
+  const eyeSets = {
+    dots:'<circle cx="39" cy="'+ey+'" r="4.5" fill="'+ink+'"/><circle cx="61" cy="'+ey+'" r="4.5" fill="'+ink+'"/>',
+    big:'<circle cx="38" cy="'+ey+'" r="9" fill="#fff"/><circle cx="62" cy="'+ey+'" r="9" fill="#fff"/><circle cx="40" cy="'+(ey+1)+'" r="4.5" fill="'+ink+'"/><circle cx="60" cy="'+(ey+1)+'" r="4.5" fill="'+ink+'"/>',
+    cyclops:'<circle cx="50" cy="'+ey+'" r="12" fill="#fff"/><circle cx="52" cy="'+(ey+1)+'" r="6" fill="'+ink+'"/>',
+    happy:'<path d="M32 '+(ey+3)+'Q39 '+(ey-7)+' 46 '+(ey+3)+'M54 '+(ey+3)+'Q61 '+(ey-7)+' 68 '+(ey+3)+'" stroke="'+ink+'" stroke-width="3.5" fill="none" stroke-linecap="round"/>'
+  };
+  const my = 68+fy;
+  const mouths = {
+    smile:'<path d="M40 '+my+'Q50 '+(my+10)+' 60 '+my+'" stroke="'+ink+'" stroke-width="3.5" fill="none" stroke-linecap="round"/>',
+    open:'<path d="M40 '+my+'Q50 '+(my+16)+' 60 '+my+'Z" fill="'+ink+'"/>',
+    o:'<ellipse cx="50" cy="'+(my+3)+'" rx="4.5" ry="5.5" fill="'+ink+'"/>',
+    cat:'<path d="M38 '+(my+2)+'Q44 '+(my+9)+' 50 '+(my+2)+'Q56 '+(my+9)+' 62 '+(my+2)+'" stroke="'+ink+'" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+  };
+  const cheek = cheeks
+    ? '<circle cx="30" cy="'+(ey+11)+'" r="5" fill="#ff5d8f" opacity=".45"/><circle cx="70" cy="'+(ey+11)+'" r="5" fill="#ff5d8f" opacity=".45"/>' : "";
+  return '<svg viewBox="0 -8 100 108" width="'+px+'" height="'+px+'" aria-hidden="true">'
+    + hats[hat] + shapes[shape] + cheek + eyeSets[eyes] + mouths[mouth] + crown + '</svg>';
+}
+
+/* ---------- private-info check (runs before publishing) ---------- */
+const CHECKS = [
+  [/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i, "email addresses"],
+  [/(^|\s)@\w/, "usernames (@something)"],
+  [/(\d[\s().+-]*){7,}/, "phone numbers or long numbers"],
+  [/(https?:\/\/|www\.)|\b[a-z0-9-]+\.(com|net|org|io|cl|me|co)\b/i, "links"],
+  [/\b(instagram|insta|ig|snapchat|snap|tiktok|telegram|whatsapp|discord|twitter|facebook)\b\s*[:\-]?\s*\S/i, "social media accounts"],
+  [/\b(my name is|i am called|i'm called|call me|me llamo|mi nombre es|soy)\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+/, "names"]
+];
+const findPrivate = t => CHECKS.filter(([re]) => re.test(t)).map(c => c[1]);
+
+/* ---------- bubble rendering ---------- */
+function addBubble(row,fresh){
+  if(seen.has(row.id)) return;
+  seen.add(row.id);
+  $("empty").style.display="none";
+  const h = hash(row.id);
+  const small = innerWidth < 640;
+  const size = Math.round(Math.min(220, 112 + Math.sqrt(row.body.length)*9) * (small ? .85 : 1));
+  const icon = Math.round(size*.3);
+  const fs = size>150 ? 14 : 12.5;
+  const lines = Math.max(1, Math.floor((size*.78 - icon) / (fs*1.3)));
+  const b = document.createElement("button");
+  b.className = "bubble" + (fresh?" fresh":"") + (mine && mine.id===row.id ? " mine" : "");
+  b.type = "button";
+  b.style.width = b.style.height = size+"px";
+  b.style.left = `calc((100% - ${size}px) * ${rnd(h,1).toFixed(3)})`;
+  b.style.top = `calc(90px + (100% - ${size}px - ${small?190:110}px) * ${rnd(h,2).toFixed(3)})`;
+  b.style.setProperty("--c",`var(${colors[h%colors.length]})`);
+  b.style.setProperty("--d",(9+rnd(h,3)*10).toFixed(1)+"s");
+  b.style.setProperty("--dx",((rnd(h,4)-.5)*(small?30:50)).toFixed(0)+"px");
+  b.style.setProperty("--dy",((rnd(h,5)-.5)*(small?30:50)).toFixed(0)+"px");
+  b.style.setProperty("--lines",lines);
+  b.style.fontSize = fs+"px";
+  b.innerHTML = critter(row.id, icon); // built only from fixed shapes and colors
+  const s = document.createElement("span");
+  s.textContent = row.body; // textContent: never render user text as HTML
+  b.appendChild(s);
+  b.addEventListener("click",()=>openRead(row));
+  space.appendChild(b);
+  while(space.children.length > MAX_BUBBLES) space.removeChild(space.firstChild);
+}
+
+function openRead(row){
+  $("readIcon").innerHTML = critter(row.id, 56);
+  $("reader").textContent = row.body;
+  $("when").textContent = new Date(row.created_at).toLocaleString();
+  $("readDlg").showModal();
+}
+
+/* ---------- load + live updates ---------- */
+async function load(){
+  const {data,error} = await sb.from("bubbles").select("*")
+    .order("created_at",{ascending:false}).limit(MAX_BUBBLES);
+  if(error){ $("status").textContent = "Couldn't load bubbles. Check your Supabase URL and key."; return; }
+  if(!data.length) $("empty").style.display="flex";
+  data.reverse().forEach(r=>addBubble(r,false));
+}
+sb.channel("bubbles-live")
+  .on("postgres_changes",{event:"INSERT",schema:"public",table:"bubbles"},p=>addBubble(p.new,true))
+  .subscribe();
+refreshButtons();
+load();
+
+/* ---------- information + stats ---------- */
+async function loadStats(){
+  try{
+    const since = new Date(Date.now()-864e5).toISOString();
+    const [all,day,first] = await Promise.all([
+      sb.from("bubbles").select("*",{count:"exact",head:true}),
+      sb.from("bubbles").select("*",{count:"exact",head:true}).gte("created_at",since),
+      sb.from("bubbles").select("created_at").order("created_at",{ascending:true}).limit(1)
+    ]);
+    $("sTotal").textContent = all.count ?? "–";
+    $("sDay").textContent = day.count ?? "–";
+    const f = first.data && first.data[0];
+    $("sFirst").textContent = f ? new Date(f.created_at).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"}) : "–";
+  }catch(e){}
+}
+$("openInfo").onclick = ()=>{ $("infoDlg").showModal(); loadStats(); };
+$("closeInfo").onclick = ()=>$("infoDlg").close();
+$("closeRead").onclick = ()=>$("readDlg").close();
+$("closeMine").onclick = ()=>$("mineDlg").close();
+
+/* ---------- my character ---------- */
+function showMine(isNew){
+  $("mineTitle").textContent = isNew ? "You earned a character!" : "Your character";
+  $("mineHero").className = "hero" + (isNew ? " new" : "");
+  $("mineHero").innerHTML = critter(mine.id, 150);
+  $("mineText").textContent = isNew
+    ? "It now lives inside your bubble for everyone to see. Only you know it's yours, and it stays with you on this device."
+    : "You've used your one bubble on this device. Look for the white ring around it in the universe.";
+  $("minePreview").textContent = mine.body;
+  $("mineDlg").showModal();
+}
+$("openMine").onclick = ()=>showMine(false);
+
+/* ---------- writing (one bubble per device) ---------- */
+const ta = $("text");
+function showStep(step){
+  $("stepWrite").hidden = step!=="write";
+  $("stepConfirm").hidden = step!=="confirm";
+}
+$("openWrite").onclick = ()=>{
+  if(mine){ showMine(false); return; }
+  $("err").textContent = ""; $("err2").textContent = "";
+  showStep("write");
+  $("writeDlg").showModal(); ta.focus();
+};
+$("cancel").onclick = ()=>$("writeDlg").close();
+ta.oninput = ()=>{ $("count").textContent = ta.value.length+" / 500"; $("err").textContent=""; };
+
+$("review").onclick = ()=>{
+  const text = ta.value.trim();
+  if(!text){ $("err").textContent="Write something first."; return; }
+  const hits = findPrivate(text);
+  if(hits.length){
+    $("err").textContent = "Please remove "+hits.join(", ")+". This space is for anonymous thoughts only.";
+    return;
+  }
+  $("preview").textContent = text;
+  $("err2").textContent = "";
+  showStep("confirm");
+};
+$("back").onclick = ()=>{ showStep("write"); ta.focus(); };
+
+$("publish").onclick = async ()=>{
+  if(mine){ $("writeDlg").close(); showMine(false); return; }
+  const text = ta.value.trim();
+  $("publish").disabled = true;
+  const {data,error} = await sb.from("bubbles").insert({body:text}).select().single();
+  $("publish").disabled = false;
+  if(error){
+    $("err2").textContent = /check constraint/i.test(error.message)
+      ? "That looks like it contains private information. Go back and rephrase. Your chance isn't used yet."
+      : "Couldn't publish. Your chance isn't used yet, so try again in a moment.";
+    return;
+  }
+  saveMine(data);
+  addBubble(data,true);
+  ta.value=""; $("count").textContent="0 / 500";
+  $("writeDlg").close();
+  showMine(true);
+};
+</script>
+</body>
+</html>
