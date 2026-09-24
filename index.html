@@ -180,7 +180,7 @@ details>*:not(summary){margin-top:0}
 <body>
 <header>
   <div>
-    <h1>One Chance<small>v1.6.0</small></h1>
+    <h1>One Chance<small>v1.7.0</small></h1>
     <p data-i18n="tagline"></p>
   </div>
   <div class="actions">
@@ -262,7 +262,7 @@ details>*:not(summary){margin-top:0}
 </dialog>
 
 <dialog id="infoDlg">
-  <h2><span data-i18n="infoTitle"></span> <span class="ver">v1.6.0</span></h2>
+  <h2><span data-i18n="infoTitle"></span> <span class="ver">v1.7.0</span></h2>
   <details open>
     <summary data-i18n="aboutT"></summary>
     <p data-i18n="aboutP"></p>
@@ -464,7 +464,7 @@ en:{
   ds21:"Took its time — a full {time} to leave a trail of {len} characters.",
   ds22:"Prickly on the outside, needed {time} to soften up and share {len} characters.",
   ds23:"Wide awake and watchful, stayed up {time} thinking before {len} characters.",
-  share:"Share", shareCta:"Try your own chance at", linkCopied:"Link copied!", revealing:"Revealing your character...",
+  share:"Share", shareCta:"Try your own chance at", shareCaption:"My One Chance character 👀", linkCopied:"Link copied!", revealing:"Revealing your character...",
   shareFail:"Couldn't share. Try again."
 },
 es:{
@@ -538,7 +538,7 @@ es:{
   ds21:"Se tomó su tiempo: {time} completos para dejar un rastro de {len} caracteres.",
   ds22:"Espinoso por fuera, necesitó {time} para ablandarse y compartir {len} caracteres.",
   ds23:"Bien despierto y atento, se quedó pensando {time} antes de {len} caracteres.",
-  share:"Compartir", shareCta:"Prueba tu propia oportunidad en", linkCopied:"¡Enlace copiado!", revealing:"Revelando tu personaje...",
+  share:"Compartir", shareCta:"Prueba tu propia oportunidad en", shareCaption:"Mi personaje de One Chance 👀", linkCopied:"¡Enlace copiado!", revealing:"Revelando tu personaje...",
   shareFail:"No se pudo compartir. Intenta de nuevo."
 }};
 let lang = "en";
@@ -961,26 +961,54 @@ function wrapText(ctx,text,x,y,maxWidth,lineHeight){
   ctx.fillText(line,x,yy);
   return yy;
 }
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
 function renderCharacterPng(id,name,desc){
   return new Promise((resolve,reject)=>{
-    const svgUrl = "data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(critter(id,420))));
+    const svgUrl = "data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(critter(id,400))));
     const img = new Image();
     img.onload = ()=>{
       try{
-        const W=600,H=740;
+        const W=640,H=860;
         const c = document.createElement("canvas"); c.width=W; c.height=H;
         const ctx = c.getContext("2d");
-        const g = ctx.createRadialGradient(W*.32,H*.24,20,W*.32,H*.24,W*.9);
+        const g = ctx.createRadialGradient(W*.3,H*.16,20,W*.3,H*.16,W*1.05);
         g.addColorStop(0,"#1b2a49"); g.addColorStop(1,"#0d1b2a");
         ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
-        ctx.drawImage(img,(W-420)/2,50,420,420);
-        ctx.textAlign = "center";
-        ctx.fillStyle = "#eef2f7"; ctx.font = "700 42px system-ui,sans-serif";
-        ctx.fillText(name, W/2, 500);
-        ctx.fillStyle = "#9fb0c8"; ctx.font = "400 16px system-ui,sans-serif";
-        const yy = wrapText(ctx, desc, W/2, 540, 480, 24);
-        ctx.fillStyle = "#8fd3c8"; ctx.font = "600 16px system-ui,sans-serif";
-        ctx.fillText(t("shareCta")+" "+(location.host||location.href), W/2, Math.max(yy+50, H-40));
+
+        /* logo lockup */
+        const lg = ctx.createRadialGradient(W/2-84,58,2,W/2-90,64,17);
+        lg.addColorStop(0,"#fff"); lg.addColorStop(1,"#8fd3c8");
+        ctx.beginPath(); ctx.arc(W/2-90,64,17,0,Math.PI*2); ctx.fillStyle=lg; ctx.fill();
+        ctx.textAlign="left"; ctx.fillStyle="#eef2f7"; ctx.font="700 24px system-ui,sans-serif";
+        ctx.fillText("One Chance", W/2-62, 72);
+        ctx.textAlign="center";
+
+        /* character art */
+        ctx.drawImage(img,(W-400)/2,110,400,400);
+
+        /* name + description */
+        ctx.fillStyle = "#eef2f7"; ctx.font = "700 44px system-ui,sans-serif";
+        ctx.fillText(name, W/2, 568);
+        ctx.fillStyle = "#9fb0c8"; ctx.font = "400 17px system-ui,sans-serif";
+        wrapText(ctx, desc, W/2, 608, 500, 26);
+
+        /* link bar, like a playlist share card */
+        const barY = H-108, barH=68, barX=40, barW=W-80;
+        ctx.fillStyle = "rgba(255,255,255,.07)";
+        roundRect(ctx, barX, barY, barW, barH, 18); ctx.fill();
+        const bg2 = ctx.createRadialGradient(barX+30,barY+barH/2-4,2,barX+34,barY+barH/2,15);
+        bg2.addColorStop(0,"#fff"); bg2.addColorStop(1,"#f2c6a0");
+        ctx.beginPath(); ctx.arc(barX+34,barY+barH/2,15,0,Math.PI*2); ctx.fillStyle=bg2; ctx.fill();
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#eef2f7"; ctx.font = "600 18px system-ui,sans-serif";
+        ctx.fillText(t("shareCta"), barX+62, barY+barH/2-5);
+        ctx.fillStyle = "#8fd3c8"; ctx.font = "600 17px system-ui,sans-serif";
+        ctx.fillText(location.host || (location.origin+location.pathname), barX+62, barY+barH/2+19);
+
         c.toBlob(b=> b ? resolve(b) : reject(new Error("no blob")), "image/png");
       }catch(e){ reject(e); }
     };
@@ -1018,30 +1046,54 @@ async function shareCharacter(){
   const name = t("nm"+tr.sp), species = t("sp"+tr.sp);
   const desc = t("ds"+tr.sp, {time: fmtDuration(mine.elapsedMs), len: mine.len ?? mine.body.length});
   const url = location.origin + location.pathname;
-  const text = `${name} — ${species}\n${desc}\n\n${t("shareCta")} ${url}`;
   const cachedBlob = (shareAsset.key===shareKey()) ? shareAsset.blob : null;
 
+  /* the image itself carries the character, description, logo and link —
+     it is always the thing we try to hand off, same as sharing a
+     Spotify playlist card. Text is just a short caption alongside it. */
   if(cachedBlob){
     const file = new File([cachedBlob], name.toLowerCase()+".png", {type:"image/png"});
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      try{ await navigator.share({files:[file], title:name, text}); return; }
+      try{ await navigator.share({files:[file], title:name, text:t("shareCaption")}); return; }
       catch(e){ if(e && e.name==="AbortError") return; }
     }
+    /* file-sharing unsupported here: hand over the ready-made image
+       as a download instead of falling back to a text-only share,
+       so what the person ends up with is always the picture. */
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(cachedBlob); a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    try{ await navigator.clipboard.writeText(url); flashStatus(t("linkCopied")); }
+    catch(e){ flashStatus(t("linkCopied")); }
+    return;
   }
+
+  /* image wasn't ready yet (rare) — build it now, then same flow */
+  const asset = await buildShareAsset();
+  const blob = asset && asset.blob;
+  if(blob){
+    const file = new File([blob], name.toLowerCase()+".png", {type:"image/png"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:name, text:t("shareCaption")}); return; }
+      catch(e){ if(e && e.name==="AbortError") return; }
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    try{ await navigator.clipboard.writeText(url); flashStatus(t("linkCopied")); }
+    catch(e){ flashStatus(t("linkCopied")); }
+    return;
+  }
+  /* couldn't build an image at all — last resort, share/copy text */
+  const text = `${name} — ${species}\n${desc}\n\n${t("shareCta")} ${url}`;
   if(navigator.share){
     try{ await navigator.share({title:name, text, url}); return; }
     catch(e){ if(e && e.name==="AbortError") return; }
   }
-  let blob = cachedBlob;
-  if(!blob){ const asset = await buildShareAsset(); blob = asset && asset.blob; }
-  if(blob){
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = name.toLowerCase()+".png";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-  }
-  try{ await navigator.clipboard.writeText(url); flashStatus(t("linkCopied")); }
-  catch(e){ flashStatus(blob ? t("linkCopied") : t("shareFail")); }
+  try{ await navigator.clipboard.writeText(text); flashStatus(t("linkCopied")); }
+  catch(_){ flashStatus(t("shareFail")); }
 }
 $("shareMine").onclick = shareCharacter;
 
