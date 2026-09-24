@@ -811,7 +811,7 @@ function addBubble(row,fresh){
   $("empty").style.display="none";
   const h = hash(row.id);
   const small = innerWidth < 640;
-  const size = Math.round(Math.min(230, 112 + Math.sqrt(row.body.length)*9) * (small ? .85 : 1));
+  const size = Math.round(Math.min(195, 96 + Math.sqrt(row.body.length)*7.5) * (small ? .85 : 1));
   const fs = size>150 ? 14 : 12.5;
   const numH = Math.round(fs*1.6);
   const lines = Math.max(1, Math.floor((size*.78 - numH) / (fs*1.3)));
@@ -945,6 +945,7 @@ function showMine(isNew){
     reveal.forEach(e=>e.style.opacity = 1);
     $("mineDlg").showModal();
   }
+  buildShareAsset();
 }
 $("openMine").onclick = ()=>showMine(false);
 $("findMine").onclick = ()=>{ $("mineDlg").close(); centerOn(els.get(mine.id)); };
@@ -965,47 +966,82 @@ function renderCharacterPng(id,name,desc){
     const svgUrl = "data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(critter(id,420))));
     const img = new Image();
     img.onload = ()=>{
-      const W=600,H=740;
-      const c = document.createElement("canvas"); c.width=W; c.height=H;
-      const ctx = c.getContext("2d");
-      const g = ctx.createRadialGradient(W*.32,H*.24,20,W*.32,H*.24,W*.9);
-      g.addColorStop(0,"#1b2a49"); g.addColorStop(1,"#0d1b2a");
-      ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
-      ctx.drawImage(img,(W-420)/2,50,420,420);
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#eef2f7"; ctx.font = "700 42px system-ui,sans-serif";
-      ctx.fillText(name, W/2, 500);
-      ctx.fillStyle = "#9fb0c8"; ctx.font = "400 16px system-ui,sans-serif";
-      const yy = wrapText(ctx, desc, W/2, 540, 480, 24);
-      ctx.fillStyle = "#8fd3c8"; ctx.font = "600 16px system-ui,sans-serif";
-      ctx.fillText(t("shareCta")+" "+(location.host||location.href), W/2, Math.max(yy+50, H-40));
-      c.toBlob(b=> b ? resolve(b) : reject(new Error("no blob")), "image/png");
+      try{
+        const W=600,H=740;
+        const c = document.createElement("canvas"); c.width=W; c.height=H;
+        const ctx = c.getContext("2d");
+        const g = ctx.createRadialGradient(W*.32,H*.24,20,W*.32,H*.24,W*.9);
+        g.addColorStop(0,"#1b2a49"); g.addColorStop(1,"#0d1b2a");
+        ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+        ctx.drawImage(img,(W-420)/2,50,420,420);
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#eef2f7"; ctx.font = "700 42px system-ui,sans-serif";
+        ctx.fillText(name, W/2, 500);
+        ctx.fillStyle = "#9fb0c8"; ctx.font = "400 16px system-ui,sans-serif";
+        const yy = wrapText(ctx, desc, W/2, 540, 480, 24);
+        ctx.fillStyle = "#8fd3c8"; ctx.font = "600 16px system-ui,sans-serif";
+        ctx.fillText(t("shareCta")+" "+(location.host||location.href), W/2, Math.max(yy+50, H-40));
+        c.toBlob(b=> b ? resolve(b) : reject(new Error("no blob")), "image/png");
+      }catch(e){ reject(e); }
     };
-    img.onerror = reject;
+    img.onerror = ()=>reject(new Error("svg image load failed"));
     img.src = svgUrl;
   });
 }
+/* Pre-render the PNG ahead of the click, since browsers only allow
+   navigator.share() to open the OS sheet when called synchronously
+   inside a click handler — awaiting work first silently blocks it. */
+let shareAsset = {blob:null, key:null};
+function shareKey(){ return mine ? mine.id+"|"+lang : null; }
+async function buildShareAsset(){
+  if(!mine) return null;
+  const key = shareKey();
+  if(shareAsset.key===key && shareAsset.blob) return shareAsset;
+  const tr = traits(mine.id);
+  const name = t("nm"+tr.sp);
+  const desc = t("ds"+tr.sp, {time: fmtDuration(mine.elapsedMs), len: mine.len ?? mine.body.length});
+  try{
+    const blob = await renderCharacterPng(mine.id, name, desc);
+    shareAsset = {blob, key};
+  }catch(e){
+    shareAsset = {blob:null, key};
+  }
+  return shareAsset;
+}
+function flashStatus(msg){
+  $("status").textContent = msg;
+  setTimeout(()=>{ if($("status").textContent===msg) $("status").textContent=""; }, 4000);
+}
 async function shareCharacter(){
+  if(!mine) return;
   const tr = traits(mine.id);
   const name = t("nm"+tr.sp), species = t("sp"+tr.sp);
   const desc = t("ds"+tr.sp, {time: fmtDuration(mine.elapsedMs), len: mine.len ?? mine.body.length});
   const url = location.origin + location.pathname;
   const text = `${name} — ${species}\n${desc}\n\n${t("shareCta")} ${url}`;
-  try{
-    const blob = await renderCharacterPng(mine.id, name, desc);
-    const file = new File([blob], name.toLowerCase()+".png", {type:"image/png"});
+  const cachedBlob = (shareAsset.key===shareKey()) ? shareAsset.blob : null;
+
+  if(cachedBlob){
+    const file = new File([cachedBlob], name.toLowerCase()+".png", {type:"image/png"});
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:name, text}); return;
+      try{ await navigator.share({files:[file], title:name, text}); return; }
+      catch(e){ if(e && e.name==="AbortError") return; }
     }
-    if(navigator.share){ await navigator.share({title:name, text, url}); return; }
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = file.name; a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-    try{ await navigator.clipboard.writeText(url); $("status").textContent = t("linkCopied"); setTimeout(()=>{ if($("status").textContent===t("linkCopied")) $("status").textContent=""; },4000); }catch(e){}
-  }catch(e){
-    try{ await navigator.clipboard.writeText(text); $("status").textContent = t("linkCopied"); setTimeout(()=>{ if($("status").textContent===t("linkCopied")) $("status").textContent=""; },4000); }
-    catch(_){ $("status").textContent = t("shareFail"); }
   }
+  if(navigator.share){
+    try{ await navigator.share({title:name, text, url}); return; }
+    catch(e){ if(e && e.name==="AbortError") return; }
+  }
+  let blob = cachedBlob;
+  if(!blob){ const asset = await buildShareAsset(); blob = asset && asset.blob; }
+  if(blob){
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name.toLowerCase()+".png";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }
+  try{ await navigator.clipboard.writeText(url); flashStatus(t("linkCopied")); }
+  catch(e){ flashStatus(blob ? t("linkCopied") : t("shareFail")); }
 }
 $("shareMine").onclick = shareCharacter;
 
